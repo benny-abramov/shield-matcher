@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shield Matcher</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Layout: a mown football pitch. A player sticker sits beside a rack of big club shields, a stadium scoreboard on top, a chalkboard bar below. */
+:root {
+  --grass: #2e8b4a;
+  --grass-2: #349a57;
+  --line: rgba(247, 251, 243, 0.28);
+  --chalk: #f7fbf3;
+  --ink: #133322;
+  --ink-soft: #4b6a56;
+  --shadow: #1c5f35;
+  --gold: #ffc83a;
+  --gold-dark: #c98d00;
+  --win: #18b862;
+  --win-soft: #dcf7e6;
+  --miss: #ff6b57;
+  --miss-ink: #b8321e;
+  --sky: #c4eaff;
+  --sky-2: #7fc4ec;
+  --board: #0e2619;
+  --board-edge: #061a0f;
+  --display: 'Lilita One', 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif;
+  --body: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  color-scheme: light;
+}
+html, body { min-height: 100%; }
+body {
+  background-color: var(--grass);
+  background-image: repeating-linear-gradient(90deg, var(--grass) 0 90px, var(--grass-2) 90px 180px);
+  color: var(--ink);
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 48px;
+}
+body::after {
+  content: ""; position: fixed; z-index: -1; pointer-events: none;
+  left: 50%; top: 50%; width: 70vmin; height: 70vmin; transform: translate(-50%, -50%);
+  border: 4px solid var(--line); border-radius: 50%;
+}
+body::before {
+  content: ""; position: fixed; z-index: -1; pointer-events: none;
+  left: 50%; top: 0; bottom: 0; width: 4px; transform: translateX(-50%); background: var(--line);
+}
+.wrap { max-width: 1000px; margin: 0 auto; display: grid; gap: 22px; }
+
+/* header */
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 20px; }
+.brand h1 {
+  margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(2rem, 5vw, 2.9rem);
+  line-height: 1; color: var(--chalk); text-shadow: 0 4px 0 var(--shadow); letter-spacing: 0.01em;
+}
+.brand p { margin: 6px 0 0; color: var(--chalk); opacity: 0.9; font-weight: 800; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.modes { display: flex; background: var(--shadow); border-radius: 999px; padding: 4px; gap: 4px; }
+.modes button, .sound {
+  font: inherit; font-weight: 900; border: 0; cursor: pointer; border-radius: 999px;
+  padding: 9px 16px; background: transparent; color: var(--chalk);
+}
+.modes button[aria-pressed="true"] { background: var(--gold); color: var(--ink); }
+.sound { background: var(--shadow); padding: 9px 14px; }
+.board {
+  display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+  background: var(--board); border: 3px solid var(--board-edge); border-radius: 12px;
+  font-family: var(--display); color: var(--gold); font-variant-numeric: tabular-nums;
+}
+.board .team { font-size: 0.8rem; letter-spacing: 0.12em; color: var(--chalk); }
+.board .num { font-size: 1.6rem; min-width: 1.3ch; text-align: center; }
+.board .round { font-family: var(--body); font-weight: 800; font-size: 0.75rem; color: var(--chalk); opacity: 0.75; letter-spacing: 0.06em; text-transform: uppercase; }
+button:focus-visible { outline: 4px solid var(--gold); outline-offset: 3px; }
+
+/* stage */
+.stage { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 28px; align-items: start; }
+.sticker {
+  margin: 0; background: var(--chalk); padding: 12px 12px 16px; border-radius: 18px;
+  transform: rotate(-2.5deg); box-shadow: 0 10px 0 var(--shadow);
+}
+.portrait {
+  position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 1 / 1.05; max-width: 100%;
+  background: radial-gradient(circle at 50% 35%, var(--sky) 0 35%, var(--sky-2) 100%);
+}
+.portrait svg { position: absolute; inset: auto 0 0 0; width: 100%; height: 100%; display: block; }
+.tag {
+  position: absolute; top: 10px; left: 10px; z-index: 1; background: var(--gold); color: var(--ink);
+  font-family: var(--display); font-size: 0.85rem; letter-spacing: 0.1em; padding: 4px 10px; border-radius: 999px;
+}
+.sticker figcaption { padding: 12px 4px 0; }
+.sticker h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 1.7rem; line-height: 1.05; text-wrap: balance; }
+.sticker p { margin: 4px 0 0; color: var(--ink-soft); font-weight: 800; }
+
+.play { display: grid; gap: 14px; min-width: 0; }
+.q {
+  margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(1.6rem, 3.6vw, 2.2rem);
+  color: var(--chalk); text-shadow: 0 3px 0 var(--shadow); line-height: 1.1; text-wrap: balance;
+}
+.rule { margin: 0; color: var(--chalk); font-weight: 800; opacity: 0.92; }
+.rack { display: grid; gap: 14px; }
+.rack.four { grid-template-columns: repeat(2, 1fr); }
+.rack.six { grid-template-columns: repeat(3, 1fr); }
+.crest {
+  position: relative; display: grid; justify-items: center; gap: 8px;
+  padding: 16px 10px 14px; border: 0; border-radius: 20px; cursor: pointer;
+  background: var(--chalk); color: var(--ink); box-shadow: 0 7px 0 var(--shadow);
+  font-family: var(--display); font-size: 1.15rem; line-height: 1.1;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.crest svg { width: min(112px, 72%); height: auto; display: block; }
+.crest:hover { transform: translateY(-3px); box-shadow: 0 10px 0 var(--shadow); }
+.crest:active { transform: translateY(4px); box-shadow: 0 3px 0 var(--shadow); }
+.crest.wrong { opacity: 0.45; filter: grayscale(0.85); cursor: default; }
+.crest.right { background: var(--win-soft); box-shadow: 0 7px 0 var(--win); cursor: default; }
+.crest[disabled] { cursor: default; }
+.crest[disabled]:hover, .crest.wrong:hover, .crest.right:hover { transform: none; }
+.mark {
+  position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; font-style: normal; font-family: var(--body); font-weight: 900; font-size: 1.2rem; color: var(--chalk);
+}
+.right .mark { background: var(--win); }
+.wrong .mark { background: var(--miss); }
+.pop { animation: pop 0.45s cubic-bezier(.3,1.6,.5,1); }
+.shake { animation: shake 0.45s ease; }
+@keyframes pop { 0% { transform: scale(0.85); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
+
+/* chalkboard bar */
+.say {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px;
+  background: var(--chalk); border-radius: 20px; padding: 16px 20px; box-shadow: 0 7px 0 var(--shadow);
+}
+.say .text { min-width: 0; flex: 1 1 280px; display: grid; gap: 2px; }
+.say .status { margin: 0; font-weight: 800; font-size: 1.05rem; }
+.say .hinttext { margin: 0; color: var(--ink-soft); font-weight: 800; }
+.verdict { margin: 0; font-family: var(--display); font-size: 2rem; line-height: 1; }
+.verdict.goal { color: var(--win); }
+.verdict.saved { color: var(--miss-ink); }
+.fact { margin: 0; font-weight: 800; max-width: 62ch; }
+.fact b { font-weight: 900; }
+.btn {
+  font-family: var(--display); font-size: 1.25rem; border: 0; cursor: pointer; border-radius: 999px;
+  padding: 13px 26px; background: var(--gold); color: var(--ink); box-shadow: 0 5px 0 var(--gold-dark);
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--gold-dark); }
+.btn.quiet { background: var(--sky); box-shadow: 0 5px 0 var(--sky-2); font-size: 1.05rem; padding: 11px 20px; }
+
+/* full time */
+.fulltime {
+  justify-self: center; width: 100%; max-width: 560px; text-align: center; display: grid; gap: 18px; justify-items: center;
+  background: var(--chalk); border-radius: 24px; padding: 28px 20px 30px; box-shadow: 0 10px 0 var(--shadow);
+}
+.fulltime h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 2.6rem; line-height: 1; }
+.fulltime p { margin: 0; font-weight: 800; font-size: 1.1rem; max-width: 40ch; }
+.fulltime .board { padding: 12px 20px; gap: 16px; }
+.fulltime .board .num { font-size: 3rem; }
+.fulltime .board .team { font-size: 1rem; }
+.fulltime .actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.footnote { margin: 0; color: var(--chalk); opacity: 0.8; font-size: 0.85rem; text-align: center; }
+
+#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+
+@media (max-width: 760px) {
+  .stage { grid-template-columns: 1fr; gap: 20px; }
+  .sticker { display: grid; grid-template-columns: 128px 1fr; align-items: center; gap: 14px; transform: rotate(-1.5deg); padding: 10px; }
+  .sticker figcaption { padding: 0; }
+  .sticker h2 { font-size: 1.45rem; }
+  .tag { font-size: 0.7rem; top: 6px; left: 6px; padding: 3px 7px; }
+}
+@media (max-width: 560px) {
+  .rack.six { grid-template-columns: repeat(2, 1fr); }
+  .crest { font-size: 1rem; }
+  .board .num { font-size: 1.3rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pop, .shake { animation: none; }
+  .crest, .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Shield Matcher</h1>
+      <p>Look at the player. Tap their club's shield.</p>
+    </div>
+    <div class="controls">
+      <div class="modes" role="group" aria-label="Game mode">
+        <button type="button" id="mode-stars" data-mode="stars">Today's Stars</button>
+        <button type="button" id="mode-legends" data-mode="legends">Legends</button>
+      </div>
+      <div class="board" aria-live="polite">
+        <span class="team">YOU</span><span class="num" id="you">0</span>
+        <span class="num">–</span>
+        <span class="num" id="keeper">0</span><span class="team">KEEPER</span>
+        <span class="round" id="round">Player 1 of 8</span>
+      </div>
+      <button type="button" class="sound" id="sound" aria-pressed="false">Sound on</button>
+    </div>
+  </header>
+  <main id="app"></main>
+  <p class="footnote">Clubs are for the 2025–26 season. Shields are made-up drawings in each club's colours, not official badges.</p>
+</div>
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<script>
+// ---------- data ----------
+const CLUBS = {
+  rma:  { name: 'Real Madrid',     short: 'RMA', country: 'Spain',        pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#e8ab00', txt: '#1d3a8f' },
+  bar:  { name: 'Barcelona',       short: 'BAR', country: 'Spain',        pat: 'stripes', c1: '#004d98', c2: '#a50044', ring: '#edbb00', txt: '#7a0030' },
+  atm:  { name: 'Atlético Madrid', short: 'ATM', country: 'Spain',        pat: 'stripes', c1: '#ffffff', c2: '#cb3524', ring: '#272e61', txt: '#ffffff' },
+  mci:  { name: 'Man City',        short: 'MCI', country: 'England',      pat: 'plain',   c1: '#6cabdd', c2: '#6cabdd', ring: '#1c2c5b', txt: '#ffffff' },
+  mun:  { name: 'Man United',      short: 'MUN', country: 'England',      pat: 'plain',   c1: '#da291c', c2: '#da291c', ring: '#fbe122', txt: '#111111' },
+  liv:  { name: 'Liverpool',       short: 'LIV', country: 'England',      pat: 'plain',   c1: '#c8102e', c2: '#c8102e', ring: '#00a398', txt: '#ffffff' },
+  ars:  { name: 'Arsenal',         short: 'ARS', country: 'England',      pat: 'center',  c1: '#ef0107', c2: '#ffffff', ring: '#023474', txt: '#ffffff' },
+  che:  { name: 'Chelsea',         short: 'CHE', country: 'England',      pat: 'plain',   c1: '#034694', c2: '#034694', ring: '#dba111', txt: '#034694' },
+  tot:  { name: 'Tottenham',       short: 'TOT', country: 'England',      pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#132257', txt: '#ffffff' },
+  eve:  { name: 'Everton',         short: 'EVE', country: 'England',      pat: 'plain',   c1: '#003399', c2: '#003399', ring: '#ffffff', txt: '#003399' },
+  bay:  { name: 'Bayern Munich',   short: 'BAY', country: 'Germany',      pat: 'plain',   c1: '#dc052d', c2: '#dc052d', ring: '#0066b2', txt: '#ffffff' },
+  bvb:  { name: 'Dortmund',        short: 'BVB', country: 'Germany',      pat: 'plain',   c1: '#fde100', c2: '#fde100', ring: '#111111', txt: '#fde100' },
+  psg:  { name: 'PSG',             short: 'PSG', country: 'France',       pat: 'center',  c1: '#004170', c2: '#da291c', ring: '#ffffff', txt: '#004170' },
+  mon:  { name: 'Monaco',          short: 'MON', country: 'France',       pat: 'diag',    c1: '#e51b23', c2: '#ffffff', ring: '#c8a14a', txt: '#ffffff' },
+  bor:  { name: 'Bordeaux',        short: 'BOR', country: 'France',       pat: 'hoop',    c1: '#001c50', c2: '#ffffff', ring: '#ffffff', txt: '#001c50' },
+  juv:  { name: 'Juventus',        short: 'JUV', country: 'Italy',        pat: 'stripes', c1: '#ffffff', c2: '#111111', ring: '#111111', txt: '#ffffff' },
+  int:  { name: 'Inter Milan',     short: 'INT', country: 'Italy',        pat: 'stripes', c1: '#0068a8', c2: '#111111', ring: '#e0c068', txt: '#111111' },
+  mil:  { name: 'AC Milan',        short: 'MIL', country: 'Italy',        pat: 'stripes', c1: '#111111', c2: '#fb090b', ring: '#ffffff', txt: '#c40008' },
+  nap:  { name: 'Napoli',          short: 'NAP', country: 'Italy',        pat: 'plain',   c1: '#12a0d7', c2: '#12a0d7', ring: '#ffffff', txt: '#0a6fa0' },
+  rom:  { name: 'Roma',            short: 'ROM', country: 'Italy',        pat: 'plain',   c1: '#8e1f2f', c2: '#8e1f2f', ring: '#f0bc42', txt: '#8e1f2f' },
+  mia:  { name: 'Inter Miami',     short: 'MIA', country: 'the USA',      pat: 'plain',   c1: '#f7b5cd', c2: '#f7b5cd', ring: '#231f20', txt: '#f7b5cd' },
+  lafc: { name: 'LAFC',            short: 'LAFC',country: 'the USA',      pat: 'plain',   c1: '#111111', c2: '#111111', ring: '#c39e6d', txt: '#111111' },
+  lag:  { name: 'LA Galaxy',       short: 'LAG', country: 'the USA',      pat: 'sash',    c1: '#00245d', c2: '#ffd200', ring: '#ffd200', txt: '#00245d' },
+  cos:  { name: 'New York Cosmos', short: 'COS', country: 'the USA',      pat: 'hoop',    c1: '#ffffff', c2: '#00843d', ring: '#00843d', txt: '#ffffff' },
+  nsr:  { name: 'Al Nassr',        short: 'NSR', country: 'Saudi Arabia', pat: 'hoop',    c1: '#fcd116', c2: '#1a3c8e', ring: '#1a3c8e', txt: '#fcd116' },
+  san:  { name: 'Santos',          short: 'SAN', country: 'Brazil',       pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#111111', txt: '#ffffff' },
+  spfc: { name: 'São Paulo',       short: 'SPFC',country: 'Brazil',       pat: 'hoop',    c1: '#ffffff', c2: '#e2001a', ring: '#111111', txt: '#ffffff' },
+  ajx:  { name: 'Ajax',            short: 'AJX', country: 'the Netherlands', pat: 'center', c1: '#ffffff', c2: '#d2122e', ring: '#d2122e', txt: '#ffffff' },
+  fey:  { name: 'Feyenoord',       short: 'FEY', country: 'the Netherlands', pat: 'halves', c1: '#e30613', c2: '#ffffff', ring: '#111111', txt: '#ffffff' },
+  psv:  { name: 'PSV',             short: 'PSV', country: 'the Netherlands', pat: 'stripes', c1: '#ffffff', c2: '#ed1c24', ring: '#111111', txt: '#ffffff' },
+  boc:  { name: 'Boca Juniors',    short: 'BOC', country: 'Argentina',    pat: 'hoop',    c1: '#103f79', c2: '#f3b229', ring: '#f3b229', txt: '#103f79' },
+  riv:  { name: 'River Plate',     short: 'RIV', country: 'Argentina',    pat: 'sash',    c1: '#ffffff', c2: '#e2001a', ring: '#e2001a', txt: '#ffffff' },
+};
+
+// National-team kits, so the shirt never gives the club away.
+const KITS = {
+  fra: { p: '#1f2b5c', n: '#ffffff', collar: '#e1262d' },
+  arg: { p: '#75aadb', stripes: '#ffffff', n: '#111111', collar: '#111111' },
+  nor: { p: '#ba0c2f', n: '#ffffff', collar: '#00205b' },
+  eng: { p: '#ffffff', n: '#1a2a5a', collar: '#1a2a5a' },
+  egy: { p: '#c8102e', n: '#ffffff', collar: '#111111' },
+  bra: { p: '#ffdf00', n: '#009c3b', collar: '#009c3b' },
+  esp: { p: '#c60b1e', n: '#ffc400', collar: '#ffc400' },
+  por: { p: '#a50021', n: '#f3c000', collar: '#006600' },
+  ger: { p: '#ffffff', n: '#111111', collar: '#111111' },
+  bel: { p: '#d00000', n: '#f9e000', collar: '#111111' },
+  kor: { p: '#d61a3c', n: '#ffffff', collar: '#111111' },
+  usa: { p: '#ffffff', n: '#0a3161', collar: '#b31942' },
+  ned: { p: '#f36c21', n: '#ffffff', collar: '#111111' },
+  ita: { p: '#0066b3', n: '#ffffff', collar: '#ffffff' },
+};
+const SKIN = ['#f6d3b3', '#ebbd94', '#d29a6c', '#b07548', '#8a5631', '#653b20'];
+const HAIR = ['#1d1612', '#3b2618', '#6b4426', '#dbb35e', '#b8642e', '#e9d7a2'];
+
+const STARS = [
+  { id: 'mbappe',   name: 'Kylian Mbappé',     country: 'France',      kit: 'fra', pos: 'Forward',    num: 10, club: 'rma',  former: ['psg', 'mon'], look: { skin: 4, hair: 'buzz', hc: 0 }, fact: 'He won the World Cup with France when he was only <b>19</b>.' },
+  { id: 'messi',    name: 'Lionel Messi',      country: 'Argentina',   kit: 'arg', pos: 'Forward',    num: 10, club: 'mia',  former: ['bar', 'psg'], look: { skin: 1, hair: 'short', hc: 2, beard: true }, fact: 'He has won the Ballon d’Or a record <b>8 times</b>.' },
+  { id: 'haaland',  name: 'Erling Haaland',    country: 'Norway',      kit: 'nor', pos: 'Striker',    num: 9,  club: 'mci',  former: ['bvb'], look: { skin: 0, hair: 'bun', hc: 3 }, fact: 'His dad, Alf-Inge, also played in the Premier League.' },
+  { id: 'bellingham', name: 'Jude Bellingham', country: 'England',     kit: 'eng', pos: 'Midfielder', num: 10, club: 'rma',  former: ['bvb'], look: { skin: 3, hair: 'short', hc: 0 }, fact: 'Birmingham City retired his number <b>22</b> shirt when he was just 17.' },
+  { id: 'salah',    name: 'Mohamed Salah',     country: 'Egypt',       kit: 'egy', pos: 'Forward',    num: 10, club: 'liv',  former: ['che', 'rom'], look: { skin: 3, hair: 'afro', hc: 0, beard: true }, fact: 'Fans call him <b>the Egyptian King</b>.' },
+  { id: 'kane',     name: 'Harry Kane',        country: 'England',     kit: 'eng', pos: 'Striker',    num: 9,  club: 'bay',  former: ['tot'], look: { skin: 0, hair: 'quiff', hc: 2 }, fact: 'He is <b>England’s all-time top goalscorer</b>.' },
+  { id: 'vini',     name: 'Vinícius Júnior',   country: 'Brazil',      kit: 'bra', pos: 'Winger',     num: 7,  club: 'rma',  former: [], look: { skin: 5, hair: 'curly', hc: 0 }, fact: 'He scored the winning goal in the <b>2022 Champions League final</b>.' },
+  { id: 'yamal',    name: 'Lamine Yamal',      country: 'Spain',       kit: 'esp', pos: 'Winger',     num: 19, club: 'bar',  former: [], look: { skin: 4, hair: 'curly', hc: 0 }, fact: 'At <b>16</b>, he became the youngest player ever to score at a Euros.' },
+  { id: 'ronaldo',  name: 'Cristiano Ronaldo', country: 'Portugal',    kit: 'por', pos: 'Forward',    num: 7,  club: 'nsr',  former: ['mun', 'rma', 'juv'], look: { skin: 2, hair: 'quiff', hc: 0 }, fact: 'He was the first player to score <b>900 official goals</b>.' },
+  { id: 'saka',     name: 'Bukayo Saka',       country: 'England',     kit: 'eng', pos: 'Winger',     num: 7,  club: 'ars',  former: [], look: { skin: 5, hair: 'buzz', hc: 0 }, fact: 'He joined his club’s academy when he was just <b>7 years old</b>.' },
+  { id: 'palmer',   name: 'Cole Palmer',       country: 'England',     kit: 'eng', pos: 'Midfielder', num: 10, club: 'che',  former: ['mci'], look: { skin: 0, hair: 'curly', hc: 1 }, fact: 'His goal celebration is pretending to <b>shiver</b> because he’s so cold.' },
+  { id: 'musiala',  name: 'Jamal Musiala',     country: 'Germany',     kit: 'ger', pos: 'Midfielder', num: 10, club: 'bay',  former: [], look: { skin: 3, hair: 'short', hc: 0 }, fact: 'He grew up partly in England and played for England’s youth teams first.' },
+  { id: 'dembele',  name: 'Ousmane Dembélé',   country: 'France',      kit: 'fra', pos: 'Forward',    num: 11, club: 'psg',  former: ['bar', 'bvb'], look: { skin: 5, hair: 'short', hc: 0 }, fact: 'He won the <b>Ballon d’Or in 2025</b>.' },
+  { id: 'debruyne', name: 'Kevin De Bruyne',   country: 'Belgium',     kit: 'bel', pos: 'Midfielder', num: 7,  club: 'nap',  former: ['mci', 'che'], look: { skin: 0, hair: 'short', hc: 4 }, fact: 'He won <b>six Premier League titles</b> before moving to Italy.' },
+  { id: 'wirtz',    name: 'Florian Wirtz',     country: 'Germany',     kit: 'ger', pos: 'Midfielder', num: 17, club: 'liv',  former: [], look: { skin: 0, hair: 'short', hc: 2 }, fact: 'In 2025 he moved clubs for a <b>British record</b> transfer fee.' },
+  { id: 'lautaro',  name: 'Lautaro Martínez',  country: 'Argentina',   kit: 'arg', pos: 'Striker',    num: 22, club: 'int',  former: [], look: { skin: 2, hair: 'short', hc: 0, beard: true }, fact: 'His nickname is <b>El Toro</b>, which means the bull.' },
+  { id: 'pedri',    name: 'Pedri',             country: 'Spain',       kit: 'esp', pos: 'Midfielder', num: 20, club: 'bar',  former: [], look: { skin: 1, hair: 'short', hc: 0 }, fact: 'He won the <b>Golden Boy</b> award for the best young player in 2021.' },
+  { id: 'son',      name: 'Son Heung-min',     country: 'South Korea', kit: 'kor', pos: 'Forward',    num: 7,  club: 'lafc', former: ['tot'], look: { skin: 1, hair: 'short', hc: 0 }, fact: 'He won the Premier League <b>Golden Boot</b> in 2021–22.' },
+  { id: 'neymar',   name: 'Neymar',            country: 'Brazil',      kit: 'bra', pos: 'Forward',    num: 10, club: 'san',  former: ['bar', 'psg'], look: { skin: 2, hair: 'quiff', hc: 5, beard: true }, fact: 'He scored more goals for Brazil than <b>Pelé</b>.' },
+  { id: 'pulisic',  name: 'Christian Pulisic', country: 'USA',         kit: 'usa', pos: 'Winger',     num: 10, club: 'mil',  former: ['bvb', 'che'], look: { skin: 0, hair: 'short', hc: 2 }, fact: 'Fans call him <b>Captain America</b>.' },
+];
+const STAR_DECOYS = ['rma', 'bar', 'atm', 'mci', 'mun', 'liv', 'ars', 'che', 'tot', 'bay', 'bvb', 'psg', 'juv', 'int', 'mil', 'nap'];
+
+const LEGENDS = [
+  { id: 'pele',       name: 'Pelé',             country: 'Brazil',      kit: 'bra', pos: 'Forward',    num: 10, clubs: ['san', 'cos'],               decoys: ['rma', 'bar', 'boc', 'juv'], look: { skin: 5, hair: 'short', hc: 0 }, fact: 'He won <b>three World Cups</b> with Brazil.' },
+  { id: 'beckham',    name: 'David Beckham',    country: 'England',     kit: 'eng', pos: 'Midfielder', num: 7,  clubs: ['mun', 'rma', 'lag', 'psg'],  decoys: ['bar', 'che', 'juv', 'bay'], look: { skin: 0, hair: 'short', hc: 3 }, fact: 'He was famous for his amazing curling <b>free kicks</b>.' },
+  { id: 'zidane',     name: 'Zinedine Zidane',  country: 'France',      kit: 'fra', pos: 'Midfielder', num: 10, clubs: ['juv', 'rma', 'bor'],         decoys: ['bar', 'mun', 'ars', 'int'], look: { skin: 2, hair: 'bald', hc: 1 }, fact: 'Later, as a coach, he won <b>three Champions Leagues in a row</b>.' },
+  { id: 'ronaldinho', name: 'Ronaldinho',       country: 'Brazil',      kit: 'bra', pos: 'Playmaker',  num: 10, clubs: ['psg', 'bar', 'mil'],         decoys: ['rma', 'che', 'bay', 'juv'], look: { skin: 3, hair: 'long', hc: 0 }, fact: 'Rival fans once stood up and <b>clapped for him</b> after he scored against their team.' },
+  { id: 'henry',      name: 'Thierry Henry',    country: 'France',      kit: 'fra', pos: 'Striker',    num: 12, clubs: ['ars', 'bar', 'juv', 'mon'],  decoys: ['che', 'rma', 'mun', 'psg'], look: { skin: 5, hair: 'bald', hc: 0 }, fact: 'He is <b>Arsenal’s all-time top goalscorer</b>.' },
+  { id: 'maradona',   name: 'Diego Maradona',   country: 'Argentina',   kit: 'arg', pos: 'Forward',    num: 10, clubs: ['boc', 'bar', 'nap'],         decoys: ['rma', 'juv', 'riv', 'mil'], look: { skin: 2, hair: 'curly', hc: 0 }, fact: 'He led Argentina to win the <b>1986 World Cup</b>.' },
+  { id: 'cruyff',     name: 'Johan Cruyff',     country: 'Netherlands', kit: 'ned', pos: 'Forward',    num: 14, clubs: ['ajx', 'bar', 'fey'],         decoys: ['rma', 'bay', 'psv', 'juv'], look: { skin: 0, hair: 'long', hc: 2 }, fact: 'A famous trick is named after him: the <b>Cruyff Turn</b>.' },
+  { id: 'kaka',       name: 'Kaká',             country: 'Brazil',      kit: 'bra', pos: 'Midfielder', num: 8,  clubs: ['mil', 'rma', 'spfc'],        decoys: ['bar', 'che', 'int', 'juv'], look: { skin: 1, hair: 'short', hc: 1 }, fact: 'He won the <b>Ballon d’Or in 2007</b>.' },
+  { id: 'r9',         name: 'Ronaldo Nazário',  country: 'Brazil',      kit: 'bra', pos: 'Striker',    num: 9,  clubs: ['bar', 'int', 'rma', 'mil'],  decoys: ['juv', 'mun', 'bay', 'che'], look: { skin: 3, hair: 'bald', hc: 0 }, fact: 'He scored <b>8 goals</b> at the 2002 World Cup and won it with Brazil.' },
+  { id: 'pirlo',      name: 'Andrea Pirlo',     country: 'Italy',       kit: 'ita', pos: 'Midfielder', num: 21, clubs: ['int', 'mil', 'juv'],         decoys: ['rma', 'bar', 'rom', 'nap'], look: { skin: 1, hair: 'long', hc: 1, beard: true }, fact: 'He won the <b>2006 World Cup</b> with Italy.' },
+  { id: 'rooney',     name: 'Wayne Rooney',     country: 'England',     kit: 'eng', pos: 'Striker',    num: 10, clubs: ['eve', 'mun'],                decoys: ['liv', 'che', 'rma', 'ars'], look: { skin: 0, hair: 'buzz', hc: 2 }, fact: 'He is <b>Manchester United’s all-time top goalscorer</b>.' },
+];
+
+const ROUNDS = 8;
+
+// ---------- drawing ----------
+function shade(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * f));
+  return `rgb(${c.join(',')})`;
+}
+
+function avatar(p) {
+  const L = p.look, skin = SKIN[L.skin], hc = HAIR[L.hc], k = KITS[p.kit], uid = 'av-' + p.id;
+  let back = '', front = '';
+  if (L.hair === 'afro') back = `<circle cx="100" cy="80" r="60" fill="${hc}"/>`;
+  if (L.hair === 'long') back = `<path d="M50 84 Q46 150 68 162 L132 162 Q154 150 150 84 Z" fill="${hc}"/>`;
+  const cap = 'M55 96 Q48 36 100 34 Q152 36 145 96 Q140 64 100 62 Q60 64 55 96Z';
+  if (['short', 'long', 'bun', 'quiff'].includes(L.hair)) front = `<path d="${cap}" fill="${hc}"/>`;
+  if (L.hair === 'bun') front += `<circle cx="100" cy="30" r="15" fill="${hc}"/>`;
+  if (L.hair === 'quiff') front += `<path d="M66 54 Q92 12 136 42 Q112 40 92 60Z" fill="${hc}"/>`;
+  if (L.hair === 'buzz') front = `<path d="M58 88 Q58 46 100 45 Q142 46 142 88 Q134 64 100 63 Q66 64 58 88Z" fill="${hc}" opacity=".8"/>`;
+  if (L.hair === 'curly' || L.hair === 'afro') {
+    for (let a = 188; a <= 352; a += 16) {
+      const r = a * Math.PI / 180;
+      front += `<circle cx="${(100 + 45 * Math.cos(r)).toFixed(1)}" cy="${(92 + 47 * Math.sin(r)).toFixed(1)}" r="14" fill="${hc}"/>`;
+    }
+  }
+  const shirt = 'M16 224 Q20 170 72 158 L128 158 Q180 170 184 224Z';
+  const stripes = k.stripes ? [34, 66, 98, 130, 162].map(x => `<rect x="${x}" y="150" width="14" height="80" fill="${k.stripes}"/>`).join('') : '';
+  const beard = L.beard ? `<path d="M58 104 Q60 154 100 152 Q140 154 142 104 Q138 132 122 138 Q100 130 78 138 Q62 132 58 104Z" fill="${hc}" opacity=".92"/>` : '';
+  return `<svg viewBox="0 0 200 224" preserveAspectRatio="xMidYMax meet" role="img" aria-label="Cartoon of ${p.name}">
+    <defs><clipPath id="${uid}"><path d="${shirt}"/></clipPath></defs>
+    ${back}
+    <rect x="86" y="126" width="28" height="38" rx="9" fill="${shade(skin, 0.86)}"/>
+    <g clip-path="url(#${uid})"><rect x="0" y="150" width="200" height="80" fill="${k.p}"/>${stripes}</g>
+    <path d="M84 158 L100 178 L116 158Z" fill="${k.collar}"/>
+    <text x="100" y="212" text-anchor="middle" font-family="Lilita One, sans-serif" font-size="26" fill="${k.n}" stroke="${k.p}" stroke-width="1">${p.num}</text>
+    <circle cx="58" cy="102" r="9" fill="${skin}"/><circle cx="142" cy="102" r="9" fill="${skin}"/>
+    <ellipse cx="100" cy="96" rx="42" ry="48" fill="${skin}"/>
+    ${front}
+    <path d="M74 86 Q84 80 94 86 M106 86 Q116 80 126 86" stroke="${hc}" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="84" cy="100" rx="6" ry="7" fill="#ffffff"/><ellipse cx="116" cy="100" rx="6" ry="7" fill="#ffffff"/>
+    <circle cx="85" cy="101" r="3.6" fill="#1b1b1b"/><circle cx="117" cy="101" r="3.6" fill="#1b1b1b"/>
+    <path d="M100 104 Q95 114 101 116" stroke="${shade(skin, 0.72)}" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="73" cy="116" r="7" fill="#ff7a7a" opacity=".22"/><circle cx="127" cy="116" r="7" fill="#ff7a7a" opacity=".22"/>
+    ${beard}
+    <path d="M86 124 Q100 136 114 124" stroke="#5a2a1e" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function shield(id) {
+  const c = CLUBS[id], uid = 'sh-' + id;
+  const P = 'M12 14 Q60 2 108 14 L108 64 Q108 112 60 136 Q12 112 12 64Z';
+  const pats = {
+    plain: '',
+    stripes: [24, 52, 80].map(x => `<rect x="${x}" y="0" width="15" height="140" fill="${c.c2}"/>`).join(''),
+    halves: `<rect x="60" y="0" width="60" height="140" fill="${c.c2}"/>`,
+    hoop: `<rect x="0" y="92" width="120" height="22" fill="${c.c2}"/>`,
+    sash: `<path d="M-10 26 L26 -10 L130 104 L94 140Z" fill="${c.c2}"/>`,
+    center: `<rect x="44" y="0" width="32" height="140" fill="${c.c2}"/>`,
+    diag: `<polygon points="0,140 120,24 120,140" fill="${c.c2}"/>`,
+  };
+  const long = c.short.length > 3;
+  return `<svg viewBox="0 0 120 140" aria-hidden="true">
+    <defs><clipPath id="${uid}"><path d="${P}"/></clipPath></defs>
+    <g clip-path="url(#${uid})"><rect width="120" height="140" fill="${c.c1}"/>${pats[c.pat]}</g>
+    <path d="${P}" fill="none" stroke="${c.ring}" stroke-width="6" stroke-linejoin="round"/>
+    <circle cx="60" cy="62" r="27" fill="${c.ring}"/>
+    <text x="60" y="${long ? 68 : 70}" text-anchor="middle" font-family="Lilita One, sans-serif" font-size="${long ? 16 : 21}" fill="${c.txt}">${c.short}</text>
+    <path d="M60 22 l3 6 6.5 1 -4.8 4.6 1.2 6.4 -5.9-3.1 -5.9 3.1 1.2-6.4 -4.8-4.6 6.5-1z" fill="${c.ring}"/>
+  </svg>`;
+}
+
+// ---------- sound & confetti ----------
+let ac;
+function tone(freqs, dur = 0.12, type = 'triangle', vol = 0.22) {
+  if (S.muted) return;
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const t = ac.currentTime;
+    freqs.forEach((f, i) => {
+      const o = ac.createOscillator(), g = ac.createGain(), s = t + i * dur;
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(vol, s + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + dur);
+      o.connect(g).connect(ac.destination); o.start(s); o.stop(s + dur + 0.02);
+    });
+  } catch (e) {}
+}
+const sfx = {
+  right: () => tone([660, 880], 0.1),
+  goal: () => tone([523, 659, 784, 1047], 0.13),
+  miss: () => tone([196, 147], 0.16, 'square', 0.08),
+};
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function confetti() {
+  if (reduceMotion) return;
+  const cv = document.getElementById('confetti'), ctx = cv.getContext('2d');
+  const w = cv.width = innerWidth, h = cv.height = innerHeight;
+  const cols = ['#ffc83a', '#ffffff', '#18b862', '#ff6b57', '#7fc4ec'];
+  const bits = Array.from({ length: 140 }, () => ({
+    x: w / 2, y: h * 0.35, vx: (Math.random() - 0.5) * 16, vy: -Math.random() * 14 - 4,
+    r: Math.random() * 6 + 4, a: Math.random() * 6, va: (Math.random() - 0.5) * 0.4, c: cols[Math.random() * cols.length | 0],
+  }));
+  const end = performance.now() + 2200;
+  (function step(now) {
+    ctx.clearRect(0, 0, w, h);
+    bits.forEach(b => {
+      b.vy += 0.4; b.vx *= 0.99; b.x += b.vx; b.y += b.vy; b.a += b.va;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.fillStyle = b.c;
+      ctx.fillRect(-b.r / 2, -b.r / 4, b.r, b.r / 2); ctx.restore();
+    });
+    if (now < end) requestAnimationFrame(step); else ctx.clearRect(0, 0, w, h);
+  })(performance.now());
+}
+
+// ---------- game ----------
+let S = { mode: 'stars', order: [], i: 0, you: 0, keeper: 0, choices: [], picked: [], misses: 0, done: false, won: false, over: false, hint: false, last: null, muted: false };
+
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const pool = () => S.mode === 'stars' ? STARS : LEGENDS;
+const current = () => pool().find(p => p.id === S.order[S.i]);
+const isRight = (p, cid) => S.mode === 'stars' ? cid === p.club : p.clubs.includes(cid);
+const answers = p => S.mode === 'stars' ? [p.club] : p.clubs;
+
+function newGame(mode) {
+  S.mode = mode;
+  S.order = shuffle(pool()).slice(0, ROUNDS).map(p => p.id);
+  S.i = 0; S.you = 0; S.keeper = 0; S.over = false;
+  startRound();
+}
+
+function startRound() {
+  const p = current();
+  if (S.mode === 'stars') {
+    const decoys = shuffle(STAR_DECOYS.filter(c => c !== p.club && !p.former.includes(c))).slice(0, 3);
+    S.choices = shuffle([p.club, ...decoys]);
+  } else {
+    S.choices = shuffle([...p.clubs, ...shuffle(p.decoys).slice(0, 6 - p.clubs.length)]);
+  }
+  S.picked = []; S.misses = 0; S.done = false; S.won = false; S.hint = false; S.last = null;
+  render();
+}
+
+function tap(cid) {
+  if (S.done || S.picked.includes(cid)) return;
+  const p = current();
+  S.picked.push(cid); S.last = cid;
+  if (isRight(p, cid)) {
+    const found = S.picked.filter(c => isRight(p, c)).length;
+    if (found === answers(p).length) return finish();
+    sfx.right();
+  } else {
+    S.misses++; sfx.miss();
+  }
+  render();
+}
+
+function finish() {
+  S.done = true;
+  S.won = S.mode === 'stars' ? S.misses === 0 : S.misses <= 1;
+  if (S.won) { S.you++; sfx.goal(); confetti(); } else { S.keeper++; sfx.right(); }
+  render();
+  document.getElementById('next')?.focus({ preventScroll: true });
+}
+
+function next() {
+  S.i++;
+  if (S.i >= ROUNDS) { S.over = true; render(); if (S.you > S.keeper) confetti(); }
+  else startRound();
+}
+
+function hintText(p) {
+  if (S.mode === 'stars') return `Hint: this club plays in ${CLUBS[p.club].country}.`;
+  const left = p.clubs.filter(c => !S.picked.includes(c));
+  return `Hint: one of them is from ${CLUBS[left[0]].country}.`;
+}
+
+function render() {
+  for (const b of document.querySelectorAll('.modes button')) b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode));
+  document.getElementById('you').textContent = S.you;
+  document.getElementById('keeper').textContent = S.keeper;
+  document.getElementById('round').textContent = S.over ? 'Full time' : `Player ${S.i + 1} of ${ROUNDS}`;
+  const snd = document.getElementById('sound');
+  snd.textContent = S.muted ? 'Sound off' : 'Sound on';
+  snd.setAttribute('aria-pressed', String(S.muted));
+
+  const app = document.getElementById('app');
+  if (S.over) {
+    const msg = S.you === ROUNDS ? 'A perfect game! Every single shot went in.'
+      : S.you > S.keeper ? 'You beat the keeper! Brilliant football knowledge.'
+      : S.you === S.keeper ? 'A draw! One more game to win it?'
+      : 'The keeper won this time. Have another go!';
+    const other = S.mode === 'stars' ? 'legends' : 'stars';
+    app.innerHTML = `<section class="fulltime">
+      <h2>Full time!</h2>
+      <div class="board"><span class="team">YOU</span><span class="num">${S.you}</span><span class="num">–</span><span class="num">${S.keeper}</span><span class="team">KEEPER</span></div>
+      <p>${msg}</p>
+      <div class="actions">
+        <button type="button" class="btn" id="again">Play again</button>
+        <button type="button" class="btn quiet" id="switch" data-mode="${other}">Try ${other === 'stars' ? 'Today’s Stars' : 'Legends'}</button>
+      </div>
+    </section>`;
+    return;
+  }
+
+  const p = current(), legend = S.mode === 'legends', need = answers(p).length;
+  const found = S.picked.filter(c => isRight(p, c)).length;
+  const first = p.name.split(' ')[0];
+  const q = legend ? `Which clubs did ${p.name} play for?` : `Which club does ${p.name} play for?`;
+  const rule = legend ? `Find all ${need} of their clubs. One wrong tap is OK!` : 'Get it first time to score a goal.';
+
+  const rack = S.choices.map(cid => {
+    const c = CLUBS[cid], picked = S.picked.includes(cid), ok = isRight(p, cid);
+    const state = picked ? (ok ? 'right' : 'wrong') : '';
+    const anim = cid === S.last ? (ok ? ' pop' : ' shake') : '';
+    const mark = picked ? `<i class="mark" aria-hidden="true">${ok ? '✓' : '✗'}</i>` : '';
+    const label = c.name + (picked ? (ok ? ', correct' : ', not this one') : '');
+    return `<button type="button" class="crest ${state}${anim}" data-c="${cid}" aria-label="${label}"${picked || S.done ? ' disabled' : ''}>${shield(cid)}<span>${c.name}</span>${mark}</button>`;
+  }).join('');
+
+  let say;
+  if (S.done) {
+    const verdict = S.won ? '<p class="verdict goal">GOAL!</p>' : '<p class="verdict saved">Saved! But you got there.</p>';
+    say = `<div class="text">${verdict}<p class="fact">${p.fact}</p></div>
+      <button type="button" class="btn" id="next">${S.i + 1 === ROUNDS ? 'See the score' : 'Next player'}</button>`;
+  } else {
+    let status;
+    if (legend) status = `Found ${found} of ${need} clubs.` + (S.misses === 1 ? ' One wrong tap used.' : '') + (S.misses > 1 ? ' Keep going, you can still find them!' : '');
+    else status = S.misses ? `Not that one. Try again!` : `Tap the shield of ${first}'s club.`;
+    say = `<div class="text"><p class="status">${status}</p>${S.hint ? `<p class="hinttext">${hintText(p)}</p>` : ''}</div>
+      ${S.hint ? '' : '<button type="button" class="btn quiet" id="hint">Need a hint?</button>'}`;
+  }
+
+  app.innerHTML = `<div class="stage">
+      <figure class="sticker">
+        <div class="portrait"><span class="tag">${legend ? 'LEGEND' : 'STAR'}</span>${avatar(p)}</div>
+        <figcaption><h2>${p.name}</h2><p>${p.country} · ${p.pos}</p></figcaption>
+      </figure>
+      <section class="play">
+        <h3 class="q">${q}</h3>
+        <p class="rule">${rule}</p>
+        <div class="rack ${legend ? 'six' : 'four'}">${rack}</div>
+      </section>
+    </div>
+    <div class="say" aria-live="polite">${say}</div>`;
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('button');
+  if (!t) return;
+  if (t.classList.contains('crest')) return tap(t.dataset.c);
+  if (t.dataset.mode) return newGame(t.dataset.mode);
+  if (t.id === 'next') return next();
+  if (t.id === 'again') return newGame(S.mode);
+  if (t.id === 'hint') { S.hint = true; render(); return; }
+  if (t.id === 'sound') { S.muted = !S.muted; render(); }
+});
+
+window.claude?.hot?.snapshot?.(() => ({ S }));
+function boot(d) {
+  if (d && d.S && d.S.order && d.S.order.length) { S = d.S; render(); }
+  else newGame('stars');
+}
+window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
+</script>
+</body>
+</html>
