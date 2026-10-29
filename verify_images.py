@@ -41,8 +41,8 @@ player_photos = {
 # Club logos
 club_logos = {
     'rma': 'Real_Madrid_CF.svg',
-    'bar': 'FC_Barcelona_crest.svg',
-    'atm': 'Atletico_Madrid_2017_logo.svg',
+    'bar': 'FC_Barcelona_(crest).svg',
+    'atm': 'Atletico_Madrid_Logo_2024.svg',
     'mci': 'Manchester_City_FC_badge.svg',
     'mun': 'Manchester_United_FC_crest.svg',
     'liv': 'Liverpool_FC.svg',
@@ -53,22 +53,22 @@ club_logos = {
     'bay': 'FC_Bayern_München_logo_(2017).svg',
     'bvb': 'Borussia_Dortmund_logo.svg',
     'psg': 'Paris_Saint-Germain_F.C..svg',
-    'mon': 'AS_Monaco_FC.svg',
-    'bor': 'Logo_des_Girondins_de_Bordeaux.svg',
-    'juv': 'Juventus_FC_-_starlogo.svg',
-    'int': 'Inter_Milan_2021.svg',
+    'mon': 'LogoASMonacoFC2021.svg',
+    'bor': 'FC_Girondins_de_Bordeaux_logo.svg',
+    'juv': 'Juventus_FC_-_logo_black_(Italy,_2020).svg',
+    'int': 'FC_Internazionale_Milano_2021.svg',
     'mil': 'Logo_of_AC_Milan.svg',
-    'nap': 'SSC_Napoli_2024.svg',
-    'rom': 'AS_Roma_Logo_2017.svg',
+    'nap': 'SSC_Napoli_2025_(white_and_azure).svg',
+    'rom': 'AS_Roma_logo_(2017).svg',
     'mia': 'Inter_Miami_CF_logo.svg',
-    'lafc': 'Los_Angeles_FC.svg',
-    'lag': 'LA_Galaxy_logo.svg',
-    'cos': 'New_York_Cosmos_(2010).svg',
-    'nsr': 'Al_Nassr_FC_logo.svg',
+    'lafc': 'Los_Angeles_Football_Club.svg',
+    'lag': 'Los_Angeles_Galaxy_logo.svg',
+    'cos': 'New_York_Cosmos_2010.svg',
+    'nsr': 'Nassr_FC_Logo.svg',
     'san': 'Santos_Logo.png',
-    'spfc': 'Sao_Paulo_FC.svg',
-    'ajx': 'AFC_Ajax.svg',
-    'fey': 'Feyenoord_logo.svg',
+    'spfc': 'São_Paulo_Futebol_Clube_logo_(2022).svg',
+    'ajx': 'Logo_AFC_Ajax_(1928-1991,_2025-).png',
+    'fey': 'Feyenoord_logo_since_2024.svg',
     'psv': 'PSV_Eindhoven.svg',
     'boc': 'Boca_Juniors_logo18.svg',
     'riv': 'River_Plate_logo.svg',
@@ -76,7 +76,7 @@ club_logos = {
 
 def check_url(name, filename):
     from urllib.parse import quote
-    url = f'https://commons.wikimedia.org/wiki/Special:FilePath/{quote(filename)}?width=200'
+    url = f'https://en.wikipedia.org/wiki/Special:FilePath/{quote(filename)}?width=200'
     try:
         req = urllib.request.Request(url, method='HEAD')
         req.add_header('User-Agent', 'ShieldMatcherBot/1.0')

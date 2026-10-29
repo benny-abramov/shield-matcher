@@ -226,23 +226,24 @@ button:focus-visible { outline: 4px solid var(--gold); outline-offset: 3px; }
     </div>
   </header>
   <main id="app"></main>
-  <p class="footnote">Clubs are for the 2025–26 season. Player photos and club badges from Wikimedia Commons.</p>
+  <p class="footnote">Clubs are for the 2025–26 season. Player photos and club badges from Wikipedia and Wikimedia Commons.</p>
 </div>
 <canvas id="confetti" aria-hidden="true"></canvas>
 
 <script>
 // ---------- helpers for Wikimedia image URLs ----------
-// Uses Special:FilePath which redirects to the actual thumbnail URL
+// Uses English Wikipedia's Special:FilePath, which redirects to the actual thumbnail URL.
+// It serves both Commons files and enwiki-only files (most club crests live there).
 function wikiImg(filename, width) {
   if (!filename) return '';
-  return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=${width || 400}`;
+  return `https://en.wikipedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=${width || 400}`;
 }
 
 // ---------- data ----------
 const CLUBS = {
   rma:  { name: 'Real Madrid',     short: 'RMA', country: 'Spain',        pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#e8ab00', txt: '#1d3a8f', logo: 'Real_Madrid_CF.svg' },
-  bar:  { name: 'Barcelona',       short: 'BAR', country: 'Spain',        pat: 'stripes', c1: '#004d98', c2: '#a50044', ring: '#edbb00', txt: '#7a0030', logo: 'FC_Barcelona_crest.svg' },
-  atm:  { name: 'Atlético Madrid', short: 'ATM', country: 'Spain',        pat: 'stripes', c1: '#ffffff', c2: '#cb3524', ring: '#272e61', txt: '#ffffff', logo: 'Atletico_Madrid_2017_logo.svg' },
+  bar:  { name: 'Barcelona',       short: 'BAR', country: 'Spain',        pat: 'stripes', c1: '#004d98', c2: '#a50044', ring: '#edbb00', txt: '#7a0030', logo: 'FC_Barcelona_(crest).svg' },
+  atm:  { name: 'Atlético Madrid', short: 'ATM', country: 'Spain',        pat: 'stripes', c1: '#ffffff', c2: '#cb3524', ring: '#272e61', txt: '#ffffff', logo: 'Atletico_Madrid_Logo_2024.svg' },
   mci:  { name: 'Man City',        short: 'MCI', country: 'England',      pat: 'plain',   c1: '#6cabdd', c2: '#6cabdd', ring: '#1c2c5b', txt: '#ffffff', logo: 'Manchester_City_FC_badge.svg' },
   mun:  { name: 'Man United',      short: 'MUN', country: 'England',      pat: 'plain',   c1: '#da291c', c2: '#da291c', ring: '#fbe122', txt: '#111111', logo: 'Manchester_United_FC_crest.svg' },
   liv:  { name: 'Liverpool',       short: 'LIV', country: 'England',      pat: 'plain',   c1: '#c8102e', c2: '#c8102e', ring: '#00a398', txt: '#ffffff', logo: 'Liverpool_FC.svg' },
@@ -253,22 +254,22 @@ const CLUBS = {
   bay:  { name: 'Bayern Munich',   short: 'BAY', country: 'Germany',      pat: 'plain',   c1: '#dc052d', c2: '#dc052d', ring: '#0066b2', txt: '#ffffff', logo: 'FC_Bayern_München_logo_(2017).svg' },
   bvb:  { name: 'Dortmund',        short: 'BVB', country: 'Germany',      pat: 'plain',   c1: '#fde100', c2: '#fde100', ring: '#111111', txt: '#fde100', logo: 'Borussia_Dortmund_logo.svg' },
   psg:  { name: 'PSG',             short: 'PSG', country: 'France',       pat: 'center',  c1: '#004170', c2: '#da291c', ring: '#ffffff', txt: '#004170', logo: 'Paris_Saint-Germain_F.C..svg' },
-  mon:  { name: 'Monaco',          short: 'MON', country: 'France',       pat: 'diag',    c1: '#e51b23', c2: '#ffffff', ring: '#c8a14a', txt: '#ffffff', logo: 'AS_Monaco_FC.svg' },
-  bor:  { name: 'Bordeaux',        short: 'BOR', country: 'France',       pat: 'hoop',    c1: '#001c50', c2: '#ffffff', ring: '#ffffff', txt: '#001c50', logo: 'Logo_des_Girondins_de_Bordeaux.svg' },
-  juv:  { name: 'Juventus',        short: 'JUV', country: 'Italy',        pat: 'stripes', c1: '#ffffff', c2: '#111111', ring: '#111111', txt: '#ffffff', logo: 'Juventus_FC_-_starlogo.svg' },
-  int:  { name: 'Inter Milan',     short: 'INT', country: 'Italy',        pat: 'stripes', c1: '#0068a8', c2: '#111111', ring: '#e0c068', txt: '#111111', logo: 'Inter_Milan_2021.svg' },
+  mon:  { name: 'Monaco',          short: 'MON', country: 'France',       pat: 'diag',    c1: '#e51b23', c2: '#ffffff', ring: '#c8a14a', txt: '#ffffff', logo: 'LogoASMonacoFC2021.svg' },
+  bor:  { name: 'Bordeaux',        short: 'BOR', country: 'France',       pat: 'hoop',    c1: '#001c50', c2: '#ffffff', ring: '#ffffff', txt: '#001c50', logo: 'FC_Girondins_de_Bordeaux_logo.svg' },
+  juv:  { name: 'Juventus',        short: 'JUV', country: 'Italy',        pat: 'stripes', c1: '#ffffff', c2: '#111111', ring: '#111111', txt: '#ffffff', logo: 'Juventus_FC_-_logo_black_(Italy,_2020).svg' },
+  int:  { name: 'Inter Milan',     short: 'INT', country: 'Italy',        pat: 'stripes', c1: '#0068a8', c2: '#111111', ring: '#e0c068', txt: '#111111', logo: 'FC_Internazionale_Milano_2021.svg' },
   mil:  { name: 'AC Milan',        short: 'MIL', country: 'Italy',        pat: 'stripes', c1: '#111111', c2: '#fb090b', ring: '#ffffff', txt: '#c40008', logo: 'Logo_of_AC_Milan.svg' },
-  nap:  { name: 'Napoli',          short: 'NAP', country: 'Italy',        pat: 'plain',   c1: '#12a0d7', c2: '#12a0d7', ring: '#ffffff', txt: '#0a6fa0', logo: 'SSC_Napoli_2024.svg' },
-  rom:  { name: 'Roma',            short: 'ROM', country: 'Italy',        pat: 'plain',   c1: '#8e1f2f', c2: '#8e1f2f', ring: '#f0bc42', txt: '#8e1f2f', logo: 'AS_Roma_Logo_2017.svg' },
+  nap:  { name: 'Napoli',          short: 'NAP', country: 'Italy',        pat: 'plain',   c1: '#12a0d7', c2: '#12a0d7', ring: '#ffffff', txt: '#0a6fa0', logo: 'SSC_Napoli_2025_(white_and_azure).svg' },
+  rom:  { name: 'Roma',            short: 'ROM', country: 'Italy',        pat: 'plain',   c1: '#8e1f2f', c2: '#8e1f2f', ring: '#f0bc42', txt: '#8e1f2f', logo: 'AS_Roma_logo_(2017).svg' },
   mia:  { name: 'Inter Miami',     short: 'MIA', country: 'the USA',      pat: 'plain',   c1: '#f7b5cd', c2: '#f7b5cd', ring: '#231f20', txt: '#f7b5cd', logo: 'Inter_Miami_CF_logo.svg' },
-  lafc: { name: 'LAFC',            short: 'LAFC',country: 'the USA',      pat: 'plain',   c1: '#111111', c2: '#111111', ring: '#c39e6d', txt: '#111111', logo: 'Los_Angeles_FC.svg' },
-  lag:  { name: 'LA Galaxy',       short: 'LAG', country: 'the USA',      pat: 'sash',    c1: '#00245d', c2: '#ffd200', ring: '#ffd200', txt: '#00245d', logo: 'LA_Galaxy_logo.svg' },
-  cos:  { name: 'New York Cosmos', short: 'COS', country: 'the USA',      pat: 'hoop',    c1: '#ffffff', c2: '#00843d', ring: '#00843d', txt: '#ffffff', logo: 'New_York_Cosmos_(2010).svg' },
-  nsr:  { name: 'Al Nassr',        short: 'NSR', country: 'Saudi Arabia', pat: 'hoop',    c1: '#fcd116', c2: '#1a3c8e', ring: '#1a3c8e', txt: '#fcd116', logo: 'Al_Nassr_FC_logo.svg' },
+  lafc: { name: 'LAFC',            short: 'LAFC',country: 'the USA',      pat: 'plain',   c1: '#111111', c2: '#111111', ring: '#c39e6d', txt: '#111111', logo: 'Los_Angeles_Football_Club.svg' },
+  lag:  { name: 'LA Galaxy',       short: 'LAG', country: 'the USA',      pat: 'sash',    c1: '#00245d', c2: '#ffd200', ring: '#ffd200', txt: '#00245d', logo: 'Los_Angeles_Galaxy_logo.svg' },
+  cos:  { name: 'New York Cosmos', short: 'COS', country: 'the USA',      pat: 'hoop',    c1: '#ffffff', c2: '#00843d', ring: '#00843d', txt: '#ffffff', logo: 'New_York_Cosmos_2010.svg' },
+  nsr:  { name: 'Al Nassr',        short: 'NSR', country: 'Saudi Arabia', pat: 'hoop',    c1: '#fcd116', c2: '#1a3c8e', ring: '#1a3c8e', txt: '#fcd116', logo: 'Nassr_FC_Logo.svg' },
   san:  { name: 'Santos',          short: 'SAN', country: 'Brazil',       pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#111111', txt: '#ffffff', logo: 'Santos_Logo.png' },
-  spfc: { name: 'São Paulo',       short: 'SPFC',country: 'Brazil',       pat: 'hoop',    c1: '#ffffff', c2: '#e2001a', ring: '#111111', txt: '#ffffff', logo: 'Sao_Paulo_FC.svg' },
-  ajx:  { name: 'Ajax',            short: 'AJX', country: 'the Netherlands', pat: 'center', c1: '#ffffff', c2: '#d2122e', ring: '#d2122e', txt: '#ffffff', logo: 'AFC_Ajax.svg' },
-  fey:  { name: 'Feyenoord',       short: 'FEY', country: 'the Netherlands', pat: 'halves', c1: '#e30613', c2: '#ffffff', ring: '#111111', txt: '#ffffff', logo: 'Feyenoord_logo.svg' },
+  spfc: { name: 'São Paulo',       short: 'SPFC',country: 'Brazil',       pat: 'hoop',    c1: '#ffffff', c2: '#e2001a', ring: '#111111', txt: '#ffffff', logo: 'São_Paulo_Futebol_Clube_logo_(2022).svg' },
+  ajx:  { name: 'Ajax',            short: 'AJX', country: 'the Netherlands', pat: 'center', c1: '#ffffff', c2: '#d2122e', ring: '#d2122e', txt: '#ffffff', logo: 'Logo_AFC_Ajax_(1928-1991,_2025-).png' },
+  fey:  { name: 'Feyenoord',       short: 'FEY', country: 'the Netherlands', pat: 'halves', c1: '#e30613', c2: '#ffffff', ring: '#111111', txt: '#ffffff', logo: 'Feyenoord_logo_since_2024.svg' },
   psv:  { name: 'PSV',             short: 'PSV', country: 'the Netherlands', pat: 'stripes', c1: '#ffffff', c2: '#ed1c24', ring: '#111111', txt: '#ffffff', logo: 'PSV_Eindhoven.svg' },
   boc:  { name: 'Boca Juniors',    short: 'BOC', country: 'Argentina',    pat: 'hoop',    c1: '#103f79', c2: '#f3b229', ring: '#f3b229', txt: '#103f79', logo: 'Boca_Juniors_logo18.svg' },
   riv:  { name: 'River Plate',     short: 'RIV', country: 'Argentina',    pat: 'sash',    c1: '#ffffff', c2: '#e2001a', ring: '#e2001a', txt: '#ffffff', logo: 'River_Plate_logo.svg' },
