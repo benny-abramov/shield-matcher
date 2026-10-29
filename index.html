@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Shield Matcher</title>
+<meta name="description" content="Football quiz game — identify which club a player belongs to by tapping their club badge.">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -87,8 +88,16 @@ button:focus-visible { outline: 4px solid var(--gold); outline-offset: 3px; }
   transform: rotate(-2.5deg); box-shadow: 0 10px 0 var(--shadow);
 }
 .portrait {
-  position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 1 / 1.05; max-width: 100%;
+  position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 3 / 4; max-width: 100%;
   background: radial-gradient(circle at 50% 35%, var(--sky) 0 35%, var(--sky-2) 100%);
+}
+.portrait img {
+  width: 100%; height: 100%; object-fit: cover; object-position: top center;
+  display: block; transition: opacity 0.3s ease;
+}
+.portrait .photo-fallback {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-size: 4rem; color: var(--sky-2); opacity: 0.5;
 }
 .portrait svg { position: absolute; inset: auto 0 0 0; width: 100%; height: 100%; display: block; }
 .tag {
@@ -115,7 +124,15 @@ button:focus-visible { outline: 4px solid var(--gold); outline-offset: 3px; }
   font-family: var(--display); font-size: 1.15rem; line-height: 1.1;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.crest svg { width: min(112px, 72%); height: auto; display: block; }
+.crest .logo-wrap {
+  width: min(112px, 72%); height: auto; aspect-ratio: 1; display: flex;
+  align-items: center; justify-content: center; overflow: hidden;
+}
+.crest .logo-wrap img {
+  max-width: 100%; max-height: 100%; object-fit: contain; display: block;
+  transition: opacity 0.3s ease;
+}
+.crest .logo-wrap svg { width: 100%; height: auto; display: block; }
 .crest:hover { transform: translateY(-3px); box-shadow: 0 10px 0 var(--shadow); }
 .crest:active { transform: translateY(4px); box-shadow: 0 3px 0 var(--shadow); }
 .crest.wrong { opacity: 0.45; filter: grayscale(0.85); cursor: default; }
@@ -209,154 +226,102 @@ button:focus-visible { outline: 4px solid var(--gold); outline-offset: 3px; }
     </div>
   </header>
   <main id="app"></main>
-  <p class="footnote">Clubs are for the 2025–26 season. Shields are made-up drawings in each club's colours, not official badges.</p>
+  <p class="footnote">Clubs are for the 2025–26 season. Player photos and club badges from Wikimedia Commons.</p>
 </div>
 <canvas id="confetti" aria-hidden="true"></canvas>
 
 <script>
+// ---------- helpers for Wikimedia image URLs ----------
+// Uses Special:FilePath which redirects to the actual thumbnail URL
+function wikiImg(filename, width) {
+  if (!filename) return '';
+  return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=${width || 400}`;
+}
+
 // ---------- data ----------
 const CLUBS = {
-  rma:  { name: 'Real Madrid',     short: 'RMA', country: 'Spain',        pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#e8ab00', txt: '#1d3a8f' },
-  bar:  { name: 'Barcelona',       short: 'BAR', country: 'Spain',        pat: 'stripes', c1: '#004d98', c2: '#a50044', ring: '#edbb00', txt: '#7a0030' },
-  atm:  { name: 'Atlético Madrid', short: 'ATM', country: 'Spain',        pat: 'stripes', c1: '#ffffff', c2: '#cb3524', ring: '#272e61', txt: '#ffffff' },
-  mci:  { name: 'Man City',        short: 'MCI', country: 'England',      pat: 'plain',   c1: '#6cabdd', c2: '#6cabdd', ring: '#1c2c5b', txt: '#ffffff' },
-  mun:  { name: 'Man United',      short: 'MUN', country: 'England',      pat: 'plain',   c1: '#da291c', c2: '#da291c', ring: '#fbe122', txt: '#111111' },
-  liv:  { name: 'Liverpool',       short: 'LIV', country: 'England',      pat: 'plain',   c1: '#c8102e', c2: '#c8102e', ring: '#00a398', txt: '#ffffff' },
-  ars:  { name: 'Arsenal',         short: 'ARS', country: 'England',      pat: 'center',  c1: '#ef0107', c2: '#ffffff', ring: '#023474', txt: '#ffffff' },
-  che:  { name: 'Chelsea',         short: 'CHE', country: 'England',      pat: 'plain',   c1: '#034694', c2: '#034694', ring: '#dba111', txt: '#034694' },
-  tot:  { name: 'Tottenham',       short: 'TOT', country: 'England',      pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#132257', txt: '#ffffff' },
-  eve:  { name: 'Everton',         short: 'EVE', country: 'England',      pat: 'plain',   c1: '#003399', c2: '#003399', ring: '#ffffff', txt: '#003399' },
-  bay:  { name: 'Bayern Munich',   short: 'BAY', country: 'Germany',      pat: 'plain',   c1: '#dc052d', c2: '#dc052d', ring: '#0066b2', txt: '#ffffff' },
-  bvb:  { name: 'Dortmund',        short: 'BVB', country: 'Germany',      pat: 'plain',   c1: '#fde100', c2: '#fde100', ring: '#111111', txt: '#fde100' },
-  psg:  { name: 'PSG',             short: 'PSG', country: 'France',       pat: 'center',  c1: '#004170', c2: '#da291c', ring: '#ffffff', txt: '#004170' },
-  mon:  { name: 'Monaco',          short: 'MON', country: 'France',       pat: 'diag',    c1: '#e51b23', c2: '#ffffff', ring: '#c8a14a', txt: '#ffffff' },
-  bor:  { name: 'Bordeaux',        short: 'BOR', country: 'France',       pat: 'hoop',    c1: '#001c50', c2: '#ffffff', ring: '#ffffff', txt: '#001c50' },
-  juv:  { name: 'Juventus',        short: 'JUV', country: 'Italy',        pat: 'stripes', c1: '#ffffff', c2: '#111111', ring: '#111111', txt: '#ffffff' },
-  int:  { name: 'Inter Milan',     short: 'INT', country: 'Italy',        pat: 'stripes', c1: '#0068a8', c2: '#111111', ring: '#e0c068', txt: '#111111' },
-  mil:  { name: 'AC Milan',        short: 'MIL', country: 'Italy',        pat: 'stripes', c1: '#111111', c2: '#fb090b', ring: '#ffffff', txt: '#c40008' },
-  nap:  { name: 'Napoli',          short: 'NAP', country: 'Italy',        pat: 'plain',   c1: '#12a0d7', c2: '#12a0d7', ring: '#ffffff', txt: '#0a6fa0' },
-  rom:  { name: 'Roma',            short: 'ROM', country: 'Italy',        pat: 'plain',   c1: '#8e1f2f', c2: '#8e1f2f', ring: '#f0bc42', txt: '#8e1f2f' },
-  mia:  { name: 'Inter Miami',     short: 'MIA', country: 'the USA',      pat: 'plain',   c1: '#f7b5cd', c2: '#f7b5cd', ring: '#231f20', txt: '#f7b5cd' },
-  lafc: { name: 'LAFC',            short: 'LAFC',country: 'the USA',      pat: 'plain',   c1: '#111111', c2: '#111111', ring: '#c39e6d', txt: '#111111' },
-  lag:  { name: 'LA Galaxy',       short: 'LAG', country: 'the USA',      pat: 'sash',    c1: '#00245d', c2: '#ffd200', ring: '#ffd200', txt: '#00245d' },
-  cos:  { name: 'New York Cosmos', short: 'COS', country: 'the USA',      pat: 'hoop',    c1: '#ffffff', c2: '#00843d', ring: '#00843d', txt: '#ffffff' },
-  nsr:  { name: 'Al Nassr',        short: 'NSR', country: 'Saudi Arabia', pat: 'hoop',    c1: '#fcd116', c2: '#1a3c8e', ring: '#1a3c8e', txt: '#fcd116' },
-  san:  { name: 'Santos',          short: 'SAN', country: 'Brazil',       pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#111111', txt: '#ffffff' },
-  spfc: { name: 'São Paulo',       short: 'SPFC',country: 'Brazil',       pat: 'hoop',    c1: '#ffffff', c2: '#e2001a', ring: '#111111', txt: '#ffffff' },
-  ajx:  { name: 'Ajax',            short: 'AJX', country: 'the Netherlands', pat: 'center', c1: '#ffffff', c2: '#d2122e', ring: '#d2122e', txt: '#ffffff' },
-  fey:  { name: 'Feyenoord',       short: 'FEY', country: 'the Netherlands', pat: 'halves', c1: '#e30613', c2: '#ffffff', ring: '#111111', txt: '#ffffff' },
-  psv:  { name: 'PSV',             short: 'PSV', country: 'the Netherlands', pat: 'stripes', c1: '#ffffff', c2: '#ed1c24', ring: '#111111', txt: '#ffffff' },
-  boc:  { name: 'Boca Juniors',    short: 'BOC', country: 'Argentina',    pat: 'hoop',    c1: '#103f79', c2: '#f3b229', ring: '#f3b229', txt: '#103f79' },
-  riv:  { name: 'River Plate',     short: 'RIV', country: 'Argentina',    pat: 'sash',    c1: '#ffffff', c2: '#e2001a', ring: '#e2001a', txt: '#ffffff' },
+  rma:  { name: 'Real Madrid',     short: 'RMA', country: 'Spain',        pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#e8ab00', txt: '#1d3a8f', logo: 'Real_Madrid_CF.svg' },
+  bar:  { name: 'Barcelona',       short: 'BAR', country: 'Spain',        pat: 'stripes', c1: '#004d98', c2: '#a50044', ring: '#edbb00', txt: '#7a0030', logo: 'FC_Barcelona_crest.svg' },
+  atm:  { name: 'Atlético Madrid', short: 'ATM', country: 'Spain',        pat: 'stripes', c1: '#ffffff', c2: '#cb3524', ring: '#272e61', txt: '#ffffff', logo: 'Atletico_Madrid_2017_logo.svg' },
+  mci:  { name: 'Man City',        short: 'MCI', country: 'England',      pat: 'plain',   c1: '#6cabdd', c2: '#6cabdd', ring: '#1c2c5b', txt: '#ffffff', logo: 'Manchester_City_FC_badge.svg' },
+  mun:  { name: 'Man United',      short: 'MUN', country: 'England',      pat: 'plain',   c1: '#da291c', c2: '#da291c', ring: '#fbe122', txt: '#111111', logo: 'Manchester_United_FC_crest.svg' },
+  liv:  { name: 'Liverpool',       short: 'LIV', country: 'England',      pat: 'plain',   c1: '#c8102e', c2: '#c8102e', ring: '#00a398', txt: '#ffffff', logo: 'Liverpool_FC.svg' },
+  ars:  { name: 'Arsenal',         short: 'ARS', country: 'England',      pat: 'center',  c1: '#ef0107', c2: '#ffffff', ring: '#023474', txt: '#ffffff', logo: 'Arsenal_FC.svg' },
+  che:  { name: 'Chelsea',         short: 'CHE', country: 'England',      pat: 'plain',   c1: '#034694', c2: '#034694', ring: '#dba111', txt: '#034694', logo: 'Chelsea_FC.svg' },
+  tot:  { name: 'Tottenham',       short: 'TOT', country: 'England',      pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#132257', txt: '#ffffff', logo: 'Tottenham_Hotspur.svg' },
+  eve:  { name: 'Everton',         short: 'EVE', country: 'England',      pat: 'plain',   c1: '#003399', c2: '#003399', ring: '#ffffff', txt: '#003399', logo: 'Everton_FC_logo.svg' },
+  bay:  { name: 'Bayern Munich',   short: 'BAY', country: 'Germany',      pat: 'plain',   c1: '#dc052d', c2: '#dc052d', ring: '#0066b2', txt: '#ffffff', logo: 'FC_Bayern_München_logo_(2017).svg' },
+  bvb:  { name: 'Dortmund',        short: 'BVB', country: 'Germany',      pat: 'plain',   c1: '#fde100', c2: '#fde100', ring: '#111111', txt: '#fde100', logo: 'Borussia_Dortmund_logo.svg' },
+  psg:  { name: 'PSG',             short: 'PSG', country: 'France',       pat: 'center',  c1: '#004170', c2: '#da291c', ring: '#ffffff', txt: '#004170', logo: 'Paris_Saint-Germain_F.C..svg' },
+  mon:  { name: 'Monaco',          short: 'MON', country: 'France',       pat: 'diag',    c1: '#e51b23', c2: '#ffffff', ring: '#c8a14a', txt: '#ffffff', logo: 'AS_Monaco_FC.svg' },
+  bor:  { name: 'Bordeaux',        short: 'BOR', country: 'France',       pat: 'hoop',    c1: '#001c50', c2: '#ffffff', ring: '#ffffff', txt: '#001c50', logo: 'Logo_des_Girondins_de_Bordeaux.svg' },
+  juv:  { name: 'Juventus',        short: 'JUV', country: 'Italy',        pat: 'stripes', c1: '#ffffff', c2: '#111111', ring: '#111111', txt: '#ffffff', logo: 'Juventus_FC_-_starlogo.svg' },
+  int:  { name: 'Inter Milan',     short: 'INT', country: 'Italy',        pat: 'stripes', c1: '#0068a8', c2: '#111111', ring: '#e0c068', txt: '#111111', logo: 'Inter_Milan_2021.svg' },
+  mil:  { name: 'AC Milan',        short: 'MIL', country: 'Italy',        pat: 'stripes', c1: '#111111', c2: '#fb090b', ring: '#ffffff', txt: '#c40008', logo: 'Logo_of_AC_Milan.svg' },
+  nap:  { name: 'Napoli',          short: 'NAP', country: 'Italy',        pat: 'plain',   c1: '#12a0d7', c2: '#12a0d7', ring: '#ffffff', txt: '#0a6fa0', logo: 'SSC_Napoli_2024.svg' },
+  rom:  { name: 'Roma',            short: 'ROM', country: 'Italy',        pat: 'plain',   c1: '#8e1f2f', c2: '#8e1f2f', ring: '#f0bc42', txt: '#8e1f2f', logo: 'AS_Roma_Logo_2017.svg' },
+  mia:  { name: 'Inter Miami',     short: 'MIA', country: 'the USA',      pat: 'plain',   c1: '#f7b5cd', c2: '#f7b5cd', ring: '#231f20', txt: '#f7b5cd', logo: 'Inter_Miami_CF_logo.svg' },
+  lafc: { name: 'LAFC',            short: 'LAFC',country: 'the USA',      pat: 'plain',   c1: '#111111', c2: '#111111', ring: '#c39e6d', txt: '#111111', logo: 'Los_Angeles_FC.svg' },
+  lag:  { name: 'LA Galaxy',       short: 'LAG', country: 'the USA',      pat: 'sash',    c1: '#00245d', c2: '#ffd200', ring: '#ffd200', txt: '#00245d', logo: 'LA_Galaxy_logo.svg' },
+  cos:  { name: 'New York Cosmos', short: 'COS', country: 'the USA',      pat: 'hoop',    c1: '#ffffff', c2: '#00843d', ring: '#00843d', txt: '#ffffff', logo: 'New_York_Cosmos_(2010).svg' },
+  nsr:  { name: 'Al Nassr',        short: 'NSR', country: 'Saudi Arabia', pat: 'hoop',    c1: '#fcd116', c2: '#1a3c8e', ring: '#1a3c8e', txt: '#fcd116', logo: 'Al_Nassr_FC_logo.svg' },
+  san:  { name: 'Santos',          short: 'SAN', country: 'Brazil',       pat: 'plain',   c1: '#ffffff', c2: '#ffffff', ring: '#111111', txt: '#ffffff', logo: 'Santos_Logo.png' },
+  spfc: { name: 'São Paulo',       short: 'SPFC',country: 'Brazil',       pat: 'hoop',    c1: '#ffffff', c2: '#e2001a', ring: '#111111', txt: '#ffffff', logo: 'Sao_Paulo_FC.svg' },
+  ajx:  { name: 'Ajax',            short: 'AJX', country: 'the Netherlands', pat: 'center', c1: '#ffffff', c2: '#d2122e', ring: '#d2122e', txt: '#ffffff', logo: 'AFC_Ajax.svg' },
+  fey:  { name: 'Feyenoord',       short: 'FEY', country: 'the Netherlands', pat: 'halves', c1: '#e30613', c2: '#ffffff', ring: '#111111', txt: '#ffffff', logo: 'Feyenoord_logo.svg' },
+  psv:  { name: 'PSV',             short: 'PSV', country: 'the Netherlands', pat: 'stripes', c1: '#ffffff', c2: '#ed1c24', ring: '#111111', txt: '#ffffff', logo: 'PSV_Eindhoven.svg' },
+  boc:  { name: 'Boca Juniors',    short: 'BOC', country: 'Argentina',    pat: 'hoop',    c1: '#103f79', c2: '#f3b229', ring: '#f3b229', txt: '#103f79', logo: 'Boca_Juniors_logo18.svg' },
+  riv:  { name: 'River Plate',     short: 'RIV', country: 'Argentina',    pat: 'sash',    c1: '#ffffff', c2: '#e2001a', ring: '#e2001a', txt: '#ffffff', logo: 'River_Plate_logo.svg' },
 };
-
-// National-team kits, so the shirt never gives the club away.
-const KITS = {
-  fra: { p: '#1f2b5c', n: '#ffffff', collar: '#e1262d' },
-  arg: { p: '#75aadb', stripes: '#ffffff', n: '#111111', collar: '#111111' },
-  nor: { p: '#ba0c2f', n: '#ffffff', collar: '#00205b' },
-  eng: { p: '#ffffff', n: '#1a2a5a', collar: '#1a2a5a' },
-  egy: { p: '#c8102e', n: '#ffffff', collar: '#111111' },
-  bra: { p: '#ffdf00', n: '#009c3b', collar: '#009c3b' },
-  esp: { p: '#c60b1e', n: '#ffc400', collar: '#ffc400' },
-  por: { p: '#a50021', n: '#f3c000', collar: '#006600' },
-  ger: { p: '#ffffff', n: '#111111', collar: '#111111' },
-  bel: { p: '#d00000', n: '#f9e000', collar: '#111111' },
-  kor: { p: '#d61a3c', n: '#ffffff', collar: '#111111' },
-  usa: { p: '#ffffff', n: '#0a3161', collar: '#b31942' },
-  ned: { p: '#f36c21', n: '#ffffff', collar: '#111111' },
-  ita: { p: '#0066b3', n: '#ffffff', collar: '#ffffff' },
-};
-const SKIN = ['#f6d3b3', '#ebbd94', '#d29a6c', '#b07548', '#8a5631', '#653b20'];
-const HAIR = ['#1d1612', '#3b2618', '#6b4426', '#dbb35e', '#b8642e', '#e9d7a2'];
 
 const STARS = [
-  { id: 'mbappe',   name: 'Kylian Mbappé',     country: 'France',      kit: 'fra', pos: 'Forward',    num: 10, club: 'rma',  former: ['psg', 'mon'], look: { skin: 4, hair: 'buzz', hc: 0 }, fact: 'He won the World Cup with France when he was only <b>19</b>.' },
-  { id: 'messi',    name: 'Lionel Messi',      country: 'Argentina',   kit: 'arg', pos: 'Forward',    num: 10, club: 'mia',  former: ['bar', 'psg'], look: { skin: 1, hair: 'short', hc: 2, beard: true }, fact: 'He has won the Ballon d’Or a record <b>8 times</b>.' },
-  { id: 'haaland',  name: 'Erling Haaland',    country: 'Norway',      kit: 'nor', pos: 'Striker',    num: 9,  club: 'mci',  former: ['bvb'], look: { skin: 0, hair: 'bun', hc: 3 }, fact: 'His dad, Alf-Inge, also played in the Premier League.' },
-  { id: 'bellingham', name: 'Jude Bellingham', country: 'England',     kit: 'eng', pos: 'Midfielder', num: 10, club: 'rma',  former: ['bvb'], look: { skin: 3, hair: 'short', hc: 0 }, fact: 'Birmingham City retired his number <b>22</b> shirt when he was just 17.' },
-  { id: 'salah',    name: 'Mohamed Salah',     country: 'Egypt',       kit: 'egy', pos: 'Forward',    num: 10, club: 'liv',  former: ['che', 'rom'], look: { skin: 3, hair: 'afro', hc: 0, beard: true }, fact: 'Fans call him <b>the Egyptian King</b>.' },
-  { id: 'kane',     name: 'Harry Kane',        country: 'England',     kit: 'eng', pos: 'Striker',    num: 9,  club: 'bay',  former: ['tot'], look: { skin: 0, hair: 'quiff', hc: 2 }, fact: 'He is <b>England’s all-time top goalscorer</b>.' },
-  { id: 'vini',     name: 'Vinícius Júnior',   country: 'Brazil',      kit: 'bra', pos: 'Winger',     num: 7,  club: 'rma',  former: [], look: { skin: 5, hair: 'curly', hc: 0 }, fact: 'He scored the winning goal in the <b>2022 Champions League final</b>.' },
-  { id: 'yamal',    name: 'Lamine Yamal',      country: 'Spain',       kit: 'esp', pos: 'Winger',     num: 19, club: 'bar',  former: [], look: { skin: 4, hair: 'curly', hc: 0 }, fact: 'At <b>16</b>, he became the youngest player ever to score at a Euros.' },
-  { id: 'ronaldo',  name: 'Cristiano Ronaldo', country: 'Portugal',    kit: 'por', pos: 'Forward',    num: 7,  club: 'nsr',  former: ['mun', 'rma', 'juv'], look: { skin: 2, hair: 'quiff', hc: 0 }, fact: 'He was the first player to score <b>900 official goals</b>.' },
-  { id: 'saka',     name: 'Bukayo Saka',       country: 'England',     kit: 'eng', pos: 'Winger',     num: 7,  club: 'ars',  former: [], look: { skin: 5, hair: 'buzz', hc: 0 }, fact: 'He joined his club’s academy when he was just <b>7 years old</b>.' },
-  { id: 'palmer',   name: 'Cole Palmer',       country: 'England',     kit: 'eng', pos: 'Midfielder', num: 10, club: 'che',  former: ['mci'], look: { skin: 0, hair: 'curly', hc: 1 }, fact: 'His goal celebration is pretending to <b>shiver</b> because he’s so cold.' },
-  { id: 'musiala',  name: 'Jamal Musiala',     country: 'Germany',     kit: 'ger', pos: 'Midfielder', num: 10, club: 'bay',  former: [], look: { skin: 3, hair: 'short', hc: 0 }, fact: 'He grew up partly in England and played for England’s youth teams first.' },
-  { id: 'dembele',  name: 'Ousmane Dembélé',   country: 'France',      kit: 'fra', pos: 'Forward',    num: 11, club: 'psg',  former: ['bar', 'bvb'], look: { skin: 5, hair: 'short', hc: 0 }, fact: 'He won the <b>Ballon d’Or in 2025</b>.' },
-  { id: 'debruyne', name: 'Kevin De Bruyne',   country: 'Belgium',     kit: 'bel', pos: 'Midfielder', num: 7,  club: 'nap',  former: ['mci', 'che'], look: { skin: 0, hair: 'short', hc: 4 }, fact: 'He won <b>six Premier League titles</b> before moving to Italy.' },
-  { id: 'wirtz',    name: 'Florian Wirtz',     country: 'Germany',     kit: 'ger', pos: 'Midfielder', num: 17, club: 'liv',  former: [], look: { skin: 0, hair: 'short', hc: 2 }, fact: 'In 2025 he moved clubs for a <b>British record</b> transfer fee.' },
-  { id: 'lautaro',  name: 'Lautaro Martínez',  country: 'Argentina',   kit: 'arg', pos: 'Striker',    num: 22, club: 'int',  former: [], look: { skin: 2, hair: 'short', hc: 0, beard: true }, fact: 'His nickname is <b>El Toro</b>, which means the bull.' },
-  { id: 'pedri',    name: 'Pedri',             country: 'Spain',       kit: 'esp', pos: 'Midfielder', num: 20, club: 'bar',  former: [], look: { skin: 1, hair: 'short', hc: 0 }, fact: 'He won the <b>Golden Boy</b> award for the best young player in 2021.' },
-  { id: 'son',      name: 'Son Heung-min',     country: 'South Korea', kit: 'kor', pos: 'Forward',    num: 7,  club: 'lafc', former: ['tot'], look: { skin: 1, hair: 'short', hc: 0 }, fact: 'He won the Premier League <b>Golden Boot</b> in 2021–22.' },
-  { id: 'neymar',   name: 'Neymar',            country: 'Brazil',      kit: 'bra', pos: 'Forward',    num: 10, club: 'san',  former: ['bar', 'psg'], look: { skin: 2, hair: 'quiff', hc: 5, beard: true }, fact: 'He scored more goals for Brazil than <b>Pelé</b>.' },
-  { id: 'pulisic',  name: 'Christian Pulisic', country: 'USA',         kit: 'usa', pos: 'Winger',     num: 10, club: 'mil',  former: ['bvb', 'che'], look: { skin: 0, hair: 'short', hc: 2 }, fact: 'Fans call him <b>Captain America</b>.' },
+  { id: 'mbappe',   name: 'Kylian Mbappé',     country: 'France',      pos: 'Forward',    num: 10, club: 'rma',  former: ['psg', 'mon'], photo: 'Kylian_Mbappe_France_v_Senegal_16_June_2026-391_(cropped).jpg', fact: 'He won the World Cup with France when he was only <b>19</b>.' },
+  { id: 'messi',    name: 'Lionel Messi',      country: 'Argentina',   pos: 'Forward',    num: 10, club: 'mia',  former: ['bar', 'psg'], photo: 'Leo_Messi_Argentina_v_Egypt_7_July_2026-1.jpg', fact: 'He has won the Ballon d\u2019Or a record <b>8 times</b>.' },
+  { id: 'haaland',  name: 'Erling Haaland',    country: 'Norway',      pos: 'Striker',    num: 9,  club: 'mci',  former: ['bvb'], photo: 'Erling_Haaland_Morocco_v_Norway_7_June_2026-51.jpg', fact: 'His dad, Alf-Inge, also played in the Premier League.' },
+  { id: 'bellingham', name: 'Jude Bellingham', country: 'England',     pos: 'Midfielder', num: 10, club: 'rma',  former: ['bvb'], photo: 'Jude_Bellingham_England_v_Ghana_23_June_2026-061_(cropped).jpg', fact: 'Birmingham City retired his number <b>22</b> shirt when he was just 17.' },
+  { id: 'salah',    name: 'Mohamed Salah',     country: 'Egypt',       pos: 'Forward',    num: 10, club: 'liv',  former: ['che', 'rom'], photo: 'Mohamed_Salah_Argentina_v_Egypt_7_July_2026-163_(cropped).jpg', fact: 'Fans call him <b>the Egyptian King</b>.' },
+  { id: 'kane',     name: 'Harry Kane',        country: 'England',     pos: 'Striker',    num: 9,  club: 'bay',  former: ['tot'], photo: 'Harry_Kane_England_v_Ghana_23_June_2026-024_(cropped).jpg', fact: 'He is <b>England\u2019s all-time top goalscorer</b>.' },
+  { id: 'vini',     name: 'Vinícius Júnior',   country: 'Brazil',      pos: 'Winger',     num: 7,  club: 'rma',  former: [], photo: 'Vinícius_Júnior_Brazil_V_Morocco_13_June_2026-207_(cropped).jpg', fact: 'He scored the winning goal in the <b>2022 Champions League final</b>.' },
+  { id: 'yamal',    name: 'Lamine Yamal',      country: 'Spain',       pos: 'Winger',     num: 19, club: 'bar',  former: [], photo: 'Lamine_Yamal_France_v_Spain_7.24.26-142.jpg', fact: 'At <b>16</b>, he became the youngest player ever to score at a Euros.' },
+  { id: 'ronaldo',  name: 'Cristiano Ronaldo', country: 'Portugal',    pos: 'Forward',    num: 7,  club: 'nsr',  former: ['mun', 'rma', 'juv'], photo: 'Cristiano_Ronaldo_Croatia_v_Portugal_2_July_2026-075_(cropped).jpg', fact: 'He was the first player to score <b>900 official goals</b>.' },
+  { id: 'saka',     name: 'Bukayo Saka',       country: 'England',     pos: 'Winger',     num: 7,  club: 'ars',  former: [], photo: 'Bukayo_Saka_England_v_Ghana_23_June_2026-057_(cropped).jpg', fact: 'He joined his club\u2019s academy when he was just <b>7 years old</b>.' },
+  { id: 'palmer',   name: 'Cole Palmer',       country: 'England',     pos: 'Midfielder', num: 10, club: 'che',  former: ['mci'], photo: 'Cole_Palmer_2025_FIFA_Club_World_Cup_Final.jpg', fact: 'His goal celebration is pretending to <b>shiver</b> because he\u2019s so cold.' },
+  { id: 'musiala',  name: 'Jamal Musiala',     country: 'Germany',     pos: 'Midfielder', num: 10, club: 'bay',  former: [], photo: 'Jamal_Musiala_Ecuador_v_Germany_25_June_2026-174_(cropped).jpg', fact: 'He grew up partly in England and played for England\u2019s youth teams first.' },
+  { id: 'dembele',  name: 'Ousmane Dembélé',   country: 'France',      pos: 'Forward',    num: 11, club: 'psg',  former: ['bar', 'bvb'], photo: 'Ousmane_Dembele_France_v_Senegal_16_June_2026-341_(cropped)_2.jpg', fact: 'He won the <b>Ballon d\u2019Or in 2025</b>.' },
+  { id: 'debruyne', name: 'Kevin De Bruyne',   country: 'Belgium',     pos: 'Midfielder', num: 7,  club: 'nap',  former: ['mci', 'che'], photo: 'Kevin_De_Bruyne_USMNT_v_Belgium_Mar_28_2026-64_(cropped).jpg', fact: 'He won <b>six Premier League titles</b> before moving to Italy.' },
+  { id: 'wirtz',    name: 'Florian Wirtz',     country: 'Germany',     pos: 'Midfielder', num: 17, club: 'liv',  former: [], photo: 'Florian_Wirtz_2024.jpg', fact: 'In 2025 he moved clubs for a <b>British record</b> transfer fee.' },
+  { id: 'lautaro',  name: 'Lautaro Martínez',  country: 'Argentina',   pos: 'Striker',    num: 22, club: 'int',  former: [], photo: 'Edison_Ndreca_Inter_(cropped_Lautaro_Martínez)_(cropped_further).jpg', fact: 'His nickname is <b>El Toro</b>, which means the bull.' },
+  { id: 'pedri',    name: 'Pedri',             country: 'Spain',       pos: 'Midfielder', num: 20, club: 'bar',  former: [], photo: 'Pedri_Argentina_v_Spain_19_July_2026-197_(cropped).jpg', fact: 'He won the <b>Golden Boy</b> award for the best young player in 2021.' },
+  { id: 'son',      name: 'Son Heung-min',     country: 'South Korea', pos: 'Forward',    num: 7,  club: 'lafc', former: ['tot'], photo: 'Son_Heung-min_-_2022_(52552243725)_(cropped).jpg', fact: 'He won the Premier League <b>Golden Boot</b> in 2021\u201322.' },
+  { id: 'neymar',   name: 'Neymar',            country: 'Brazil',      pos: 'Forward',    num: 10, club: 'san',  former: ['bar', 'psg'], photo: 'Neymar_Junior_Brazil_V_Morocco_13_June_2026-40.jpg', fact: 'He scored more goals for Brazil than <b>Pelé</b>.' },
+  { id: 'pulisic',  name: 'Christian Pulisic', country: 'USA',         pos: 'Winger',     num: 10, club: 'mil',  former: ['bvb', 'che'], photo: 'Christian_Pulisic_USMNT_v_Belgium_Mar_28_2026-73_(cropped).jpg', fact: 'Fans call him <b>Captain America</b>.' },
 ];
 const STAR_DECOYS = ['rma', 'bar', 'atm', 'mci', 'mun', 'liv', 'ars', 'che', 'tot', 'bay', 'bvb', 'psg', 'juv', 'int', 'mil', 'nap'];
 
 const LEGENDS = [
-  { id: 'pele',       name: 'Pelé',             country: 'Brazil',      kit: 'bra', pos: 'Forward',    num: 10, clubs: ['san', 'cos'],               decoys: ['rma', 'bar', 'boc', 'juv'], look: { skin: 5, hair: 'short', hc: 0 }, fact: 'He won <b>three World Cups</b> with Brazil.' },
-  { id: 'beckham',    name: 'David Beckham',    country: 'England',     kit: 'eng', pos: 'Midfielder', num: 7,  clubs: ['mun', 'rma', 'lag', 'psg'],  decoys: ['bar', 'che', 'juv', 'bay'], look: { skin: 0, hair: 'short', hc: 3 }, fact: 'He was famous for his amazing curling <b>free kicks</b>.' },
-  { id: 'zidane',     name: 'Zinedine Zidane',  country: 'France',      kit: 'fra', pos: 'Midfielder', num: 10, clubs: ['juv', 'rma', 'bor'],         decoys: ['bar', 'mun', 'ars', 'int'], look: { skin: 2, hair: 'bald', hc: 1 }, fact: 'Later, as a coach, he won <b>three Champions Leagues in a row</b>.' },
-  { id: 'ronaldinho', name: 'Ronaldinho',       country: 'Brazil',      kit: 'bra', pos: 'Playmaker',  num: 10, clubs: ['psg', 'bar', 'mil'],         decoys: ['rma', 'che', 'bay', 'juv'], look: { skin: 3, hair: 'long', hc: 0 }, fact: 'Rival fans once stood up and <b>clapped for him</b> after he scored against their team.' },
-  { id: 'henry',      name: 'Thierry Henry',    country: 'France',      kit: 'fra', pos: 'Striker',    num: 12, clubs: ['ars', 'bar', 'juv', 'mon'],  decoys: ['che', 'rma', 'mun', 'psg'], look: { skin: 5, hair: 'bald', hc: 0 }, fact: 'He is <b>Arsenal’s all-time top goalscorer</b>.' },
-  { id: 'maradona',   name: 'Diego Maradona',   country: 'Argentina',   kit: 'arg', pos: 'Forward',    num: 10, clubs: ['boc', 'bar', 'nap'],         decoys: ['rma', 'juv', 'riv', 'mil'], look: { skin: 2, hair: 'curly', hc: 0 }, fact: 'He led Argentina to win the <b>1986 World Cup</b>.' },
-  { id: 'cruyff',     name: 'Johan Cruyff',     country: 'Netherlands', kit: 'ned', pos: 'Forward',    num: 14, clubs: ['ajx', 'bar', 'fey'],         decoys: ['rma', 'bay', 'psv', 'juv'], look: { skin: 0, hair: 'long', hc: 2 }, fact: 'A famous trick is named after him: the <b>Cruyff Turn</b>.' },
-  { id: 'kaka',       name: 'Kaká',             country: 'Brazil',      kit: 'bra', pos: 'Midfielder', num: 8,  clubs: ['mil', 'rma', 'spfc'],        decoys: ['bar', 'che', 'int', 'juv'], look: { skin: 1, hair: 'short', hc: 1 }, fact: 'He won the <b>Ballon d’Or in 2007</b>.' },
-  { id: 'r9',         name: 'Ronaldo Nazário',  country: 'Brazil',      kit: 'bra', pos: 'Striker',    num: 9,  clubs: ['bar', 'int', 'rma', 'mil'],  decoys: ['juv', 'mun', 'bay', 'che'], look: { skin: 3, hair: 'bald', hc: 0 }, fact: 'He scored <b>8 goals</b> at the 2002 World Cup and won it with Brazil.' },
-  { id: 'pirlo',      name: 'Andrea Pirlo',     country: 'Italy',       kit: 'ita', pos: 'Midfielder', num: 21, clubs: ['int', 'mil', 'juv'],         decoys: ['rma', 'bar', 'rom', 'nap'], look: { skin: 1, hair: 'long', hc: 1, beard: true }, fact: 'He won the <b>2006 World Cup</b> with Italy.' },
-  { id: 'rooney',     name: 'Wayne Rooney',     country: 'England',     kit: 'eng', pos: 'Striker',    num: 10, clubs: ['eve', 'mun'],                decoys: ['liv', 'che', 'rma', 'ars'], look: { skin: 0, hair: 'buzz', hc: 2 }, fact: 'He is <b>Manchester United’s all-time top goalscorer</b>.' },
+  { id: 'pele',       name: 'Pelé',             country: 'Brazil',      pos: 'Forward',    num: 10, clubs: ['san', 'cos'],               decoys: ['rma', 'bar', 'boc', 'juv'], photo: 'Pele_con_brasil_(cropped).jpg', fact: 'He won <b>three World Cups</b> with Brazil.' },
+  { id: 'beckham',    name: 'David Beckham',    country: 'England',     pos: 'Midfielder', num: 7,  clubs: ['mun', 'rma', 'lag', 'psg'],  decoys: ['bar', 'che', 'juv', 'bay'], photo: 'David_Beckham_UNICEF_(cropped2).jpg', fact: 'He was famous for his amazing curling <b>free kicks</b>.' },
+  { id: 'zidane',     name: 'Zinedine Zidane',  country: 'France',      pos: 'Midfielder', num: 10, clubs: ['juv', 'rma', 'bor'],         decoys: ['bar', 'mun', 'ars', 'int'], photo: 'Zinedine_Zidane_by_Tasnim_03.jpg', fact: 'Later, as a coach, he won <b>three Champions Leagues in a row</b>.' },
+  { id: 'ronaldinho', name: 'Ronaldinho',       country: 'Brazil',      pos: 'Playmaker',  num: 10, clubs: ['psg', 'bar', 'mil'],         decoys: ['rma', 'che', 'bay', 'juv'], photo: 'Ronaldinho_in_2019.jpg', fact: 'Rival fans once stood up and <b>clapped for him</b> after he scored against their team.' },
+  { id: 'henry',      name: 'Thierry Henry',    country: 'France',      pos: 'Striker',    num: 12, clubs: ['ars', 'bar', 'juv', 'mon'],  decoys: ['che', 'rma', 'mun', 'psg'], photo: 'Thierry_Henry_(51649035951)_(cropped).jpg', fact: 'He is <b>Arsenal\u2019s all-time top goalscorer</b>.' },
+  { id: 'maradona',   name: 'Diego Maradona',   country: 'Argentina',   pos: 'Forward',    num: 10, clubs: ['boc', 'bar', 'nap'],         decoys: ['rma', 'juv', 'riv', 'mil'], photo: 'Argentina_celebrando_copa_(cropped).jpg', fact: 'He led Argentina to win the <b>1986 World Cup</b>.' },
+  { id: 'cruyff',     name: 'Johan Cruyff',     country: 'Netherlands', pos: 'Forward',    num: 14, clubs: ['ajx', 'bar', 'fey'],         decoys: ['rma', 'bay', 'psv', 'juv'], photo: 'Johan_Cruijff_(1974).jpg', fact: 'A famous trick is named after him: the <b>Cruyff Turn</b>.' },
+  { id: 'kaka',       name: 'Kaká',             country: 'Brazil',      pos: 'Midfielder', num: 8,  clubs: ['mil', 'rma', 'spfc'],        decoys: ['bar', 'che', 'int', 'juv'], photo: 'Kaká_visited_Stadium_St._Petersburg.jpg', fact: 'He won the <b>Ballon d\u2019Or in 2007</b>.' },
+  { id: 'r9',         name: 'Ronaldo Nazário',  country: 'Brazil',      pos: 'Striker',    num: 9,  clubs: ['bar', 'int', 'rma', 'mil'],  decoys: ['juv', 'mun', 'bay', 'che'], photo: '12.12.2025_–_Cerimônia_de_lançamento_do_SBT_News_-_54980664160_(cropped2).jpg', fact: 'He scored <b>8 goals</b> at the 2002 World Cup and won it with Brazil.' },
+  { id: 'pirlo',      name: 'Andrea Pirlo',     country: 'Italy',       pos: 'Midfielder', num: 21, clubs: ['int', 'mil', 'juv'],         decoys: ['rma', 'bar', 'rom', 'nap'], photo: '20150616_-_Portugal_-_Italie_-_Genève_-_Andrea_Pirlo_(cropped).jpg', fact: 'He won the <b>2006 World Cup</b> with Italy.' },
+  { id: 'rooney',     name: 'Wayne Rooney',     country: 'England',     pos: 'Striker',    num: 10, clubs: ['eve', 'mun'],                decoys: ['liv', 'che', 'rma', 'ars'], photo: 'Wayne_Rooney_(50121495731)_(cropped).jpg', fact: 'He is <b>Manchester United\u2019s all-time top goalscorer</b>.' },
 ];
 
 const ROUNDS = 8;
 
-// ---------- drawing ----------
+// ---------- drawing (SVG shields as fallback) ----------
 function shade(hex, f) {
   const n = parseInt(hex.slice(1), 16);
   const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * f));
   return `rgb(${c.join(',')})`;
 }
 
-function avatar(p) {
-  const L = p.look, skin = SKIN[L.skin], hc = HAIR[L.hc], k = KITS[p.kit], uid = 'av-' + p.id;
-  let back = '', front = '';
-  if (L.hair === 'afro') back = `<circle cx="100" cy="80" r="60" fill="${hc}"/>`;
-  if (L.hair === 'long') back = `<path d="M50 84 Q46 150 68 162 L132 162 Q154 150 150 84 Z" fill="${hc}"/>`;
-  const cap = 'M55 96 Q48 36 100 34 Q152 36 145 96 Q140 64 100 62 Q60 64 55 96Z';
-  if (['short', 'long', 'bun', 'quiff'].includes(L.hair)) front = `<path d="${cap}" fill="${hc}"/>`;
-  if (L.hair === 'bun') front += `<circle cx="100" cy="30" r="15" fill="${hc}"/>`;
-  if (L.hair === 'quiff') front += `<path d="M66 54 Q92 12 136 42 Q112 40 92 60Z" fill="${hc}"/>`;
-  if (L.hair === 'buzz') front = `<path d="M58 88 Q58 46 100 45 Q142 46 142 88 Q134 64 100 63 Q66 64 58 88Z" fill="${hc}" opacity=".8"/>`;
-  if (L.hair === 'curly' || L.hair === 'afro') {
-    for (let a = 188; a <= 352; a += 16) {
-      const r = a * Math.PI / 180;
-      front += `<circle cx="${(100 + 45 * Math.cos(r)).toFixed(1)}" cy="${(92 + 47 * Math.sin(r)).toFixed(1)}" r="14" fill="${hc}"/>`;
-    }
-  }
-  const shirt = 'M16 224 Q20 170 72 158 L128 158 Q180 170 184 224Z';
-  const stripes = k.stripes ? [34, 66, 98, 130, 162].map(x => `<rect x="${x}" y="150" width="14" height="80" fill="${k.stripes}"/>`).join('') : '';
-  const beard = L.beard ? `<path d="M58 104 Q60 154 100 152 Q140 154 142 104 Q138 132 122 138 Q100 130 78 138 Q62 132 58 104Z" fill="${hc}" opacity=".92"/>` : '';
-  return `<svg viewBox="0 0 200 224" preserveAspectRatio="xMidYMax meet" role="img" aria-label="Cartoon of ${p.name}">
-    <defs><clipPath id="${uid}"><path d="${shirt}"/></clipPath></defs>
-    ${back}
-    <rect x="86" y="126" width="28" height="38" rx="9" fill="${shade(skin, 0.86)}"/>
-    <g clip-path="url(#${uid})"><rect x="0" y="150" width="200" height="80" fill="${k.p}"/>${stripes}</g>
-    <path d="M84 158 L100 178 L116 158Z" fill="${k.collar}"/>
-    <text x="100" y="212" text-anchor="middle" font-family="Lilita One, sans-serif" font-size="26" fill="${k.n}" stroke="${k.p}" stroke-width="1">${p.num}</text>
-    <circle cx="58" cy="102" r="9" fill="${skin}"/><circle cx="142" cy="102" r="9" fill="${skin}"/>
-    <ellipse cx="100" cy="96" rx="42" ry="48" fill="${skin}"/>
-    ${front}
-    <path d="M74 86 Q84 80 94 86 M106 86 Q116 80 126 86" stroke="${hc}" stroke-width="4" fill="none" stroke-linecap="round"/>
-    <ellipse cx="84" cy="100" rx="6" ry="7" fill="#ffffff"/><ellipse cx="116" cy="100" rx="6" ry="7" fill="#ffffff"/>
-    <circle cx="85" cy="101" r="3.6" fill="#1b1b1b"/><circle cx="117" cy="101" r="3.6" fill="#1b1b1b"/>
-    <path d="M100 104 Q95 114 101 116" stroke="${shade(skin, 0.72)}" stroke-width="3" fill="none" stroke-linecap="round"/>
-    <circle cx="73" cy="116" r="7" fill="#ff7a7a" opacity=".22"/><circle cx="127" cy="116" r="7" fill="#ff7a7a" opacity=".22"/>
-    ${beard}
-    <path d="M86 124 Q100 136 114 124" stroke="#5a2a1e" stroke-width="4" fill="none" stroke-linecap="round"/>
-  </svg>`;
-}
-
-function shield(id) {
+function shieldSVG(id) {
   const c = CLUBS[id], uid = 'sh-' + id;
   const P = 'M12 14 Q60 2 108 14 L108 64 Q108 112 60 136 Q12 112 12 64Z';
   const pats = {
@@ -377,6 +342,27 @@ function shield(id) {
     <text x="60" y="${long ? 68 : 70}" text-anchor="middle" font-family="Lilita One, sans-serif" font-size="${long ? 16 : 21}" fill="${c.txt}">${c.short}</text>
     <path d="M60 22 l3 6 6.5 1 -4.8 4.6 1.2 6.4 -5.9-3.1 -5.9 3.1 1.2-6.4 -4.8-4.6 6.5-1z" fill="${c.ring}"/>
   </svg>`;
+}
+
+// Real club badge image with SVG fallback
+function clubBadge(id) {
+  const c = CLUBS[id];
+  if (c.logo) {
+    const url = wikiImg(c.logo, 200);
+    return `<div class="logo-wrap"><img src="${url}" alt="${c.name} badge" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/><div style="display:none">${shieldSVG(id)}</div></div>`;
+  }
+  return `<div class="logo-wrap">${shieldSVG(id)}</div>`;
+}
+
+// Real player photo with initials fallback
+function playerPhoto(p) {
+  if (p.photo) {
+    const url = wikiImg(p.photo, 400);
+    const initials = p.name.split(' ').map(n => n[0]).join('').slice(0, 2);
+    return `<img src="${url}" alt="Photo of ${p.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><div class="photo-fallback" style="display:none">${initials}</div>`;
+  }
+  const initials = p.name.split(' ').map(n => n[0]).join('').slice(0, 2);
+  return `<div class="photo-fallback">${initials}</div>`;
 }
 
 // ---------- sound & confetti ----------
@@ -508,7 +494,7 @@ function render() {
       <p>${msg}</p>
       <div class="actions">
         <button type="button" class="btn" id="again">Play again</button>
-        <button type="button" class="btn quiet" id="switch" data-mode="${other}">Try ${other === 'stars' ? 'Today’s Stars' : 'Legends'}</button>
+        <button type="button" class="btn quiet" id="switch" data-mode="${other}">Try ${other === 'stars' ? 'Today\u2019s Stars' : 'Legends'}</button>
       </div>
     </section>`;
     return;
@@ -526,7 +512,7 @@ function render() {
     const anim = cid === S.last ? (ok ? ' pop' : ' shake') : '';
     const mark = picked ? `<i class="mark" aria-hidden="true">${ok ? '✓' : '✗'}</i>` : '';
     const label = c.name + (picked ? (ok ? ', correct' : ', not this one') : '');
-    return `<button type="button" class="crest ${state}${anim}" data-c="${cid}" aria-label="${label}"${picked || S.done ? ' disabled' : ''}>${shield(cid)}<span>${c.name}</span>${mark}</button>`;
+    return `<button type="button" class="crest ${state}${anim}" data-c="${cid}" aria-label="${label}"${picked || S.done ? ' disabled' : ''}>${clubBadge(cid)}<span>${c.name}</span>${mark}</button>`;
   }).join('');
 
   let say;
@@ -544,7 +530,7 @@ function render() {
 
   app.innerHTML = `<div class="stage">
       <figure class="sticker">
-        <div class="portrait"><span class="tag">${legend ? 'LEGEND' : 'STAR'}</span>${avatar(p)}</div>
+        <div class="portrait"><span class="tag">${legend ? 'LEGEND' : 'STAR'}</span>${playerPhoto(p)}</div>
         <figcaption><h2>${p.name}</h2><p>${p.country} · ${p.pos}</p></figcaption>
       </figure>
       <section class="play">
